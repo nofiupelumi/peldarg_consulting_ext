@@ -34,7 +34,7 @@ def compute_signature(secret: str, payload: bytes) -> str:
     return hmac.new(secret.encode('utf-8'), payload, hashlib.sha256).hexdigest()
 
 
-def upload_results(upload_url: str, token: str, doc_id: str, paths: Dict[str, str], summary: Dict) -> None:
+def upload_results(upload_url: str, token: str, doc_id: str, request_id: str, paths: Dict[str, str], summary: Dict) -> None:
     if not upload_url:
         print('[agent] RESULT_UPLOAD_URL empty; skipping upload to app')
         return
@@ -44,7 +44,7 @@ def upload_results(upload_url: str, token: str, doc_id: str, paths: Dict[str, st
             p = paths.get(key)
             if p and os.path.exists(p):
                 files[key] = (os.path.basename(p), open(p, 'rb'), 'application/octet-stream')
-        data = {'doc_id': doc_id or '', 'summary': json.dumps(summary)}
+        data = {'doc_id': doc_id or '', 'request_id': request_id or '', 'summary': json.dumps(summary)}
         headers = {}
         if token:
             headers['Authorization'] = f"Bearer {token}"
@@ -77,6 +77,8 @@ def main() -> int:
     result_upload_url = os.getenv('RESULT_UPLOAD_URL', '').strip()
     result_upload_token = os.getenv('RESULT_UPLOAD_TOKEN', '').strip()
     doc_id = os.getenv('DOC_ID', '')
+    request_id = os.getenv('REQUEST_ID', '').strip()
+    callback_token = (os.getenv('CALLBACK_TOKEN', '').strip() or result_upload_token)
 
     # Resolve PDF path
     tmp_pdf = tempfile.mktemp(suffix='.pdf')
@@ -122,20 +124,29 @@ def main() -> int:
 
     summary = {
         'status': 'success',
-        'counts': {'rows': int(len(df))},
+        'counts': {
+            'rows': int(len(df)),
+            'pages_processed': int((page_end - page_start + 1) if page_end else 0),
+            'pages_with_results': int((page_end - page_start + 1) if page_end and len(df) > 0 else 0),
+        },
         'files': {'csv': csv_path, 'xlsx': xlsx_path},
         'filename': original_filename,
+        'doc_id': doc_id,
+        'request_id': request_id,
     }
 
     # Upload to app
     if not result_upload_token:
         print('[agent] RESULT_UPLOAD_TOKEN is empty; upload may be rejected by app')
-    upload_results(result_upload_url, result_upload_token, doc_id, {'csv': csv_path, 'xlsx': xlsx_path}, summary)
+    upload_results(result_upload_url, result_upload_token, doc_id, request_id, {'csv': csv_path, 'xlsx': xlsx_path}, summary)
 
     # Callback
     if callback_url:
         payload = json.dumps(summary).encode('utf-8')
         headers = {'Content-Type': 'application/json'}
+        if callback_token:
+            headers['Authorization'] = f"Bearer {callback_token}"
+            headers['X-Extractor-Token'] = callback_token
         if callback_secret:
             headers['X-Extractor-Signature'] = compute_signature(callback_secret, payload)
         try:

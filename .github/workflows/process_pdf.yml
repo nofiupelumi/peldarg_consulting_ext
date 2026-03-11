@@ -96,12 +96,14 @@ jobs:
           SOURCE_FILE: source.pdf
           ORIGINAL_FILENAME: ${{ github.event.client_payload.original_filename }}
           SESSION: ${{ github.event.client_payload.session }}
-          GEMINI_API_KEY: ${{ secrets[github.event.client_payload.api_key_tier] || secrets.GEMINI_API_KEY_FREE_TIER_1 }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_PAID }}
           CALLBACK_URL: ${{ github.event.client_payload.callback_url }}
           CALLBACK_HMAC_SECRET: ${{ secrets.CALLBACK_HMAC_SECRET }}
           RESULT_UPLOAD_URL: ${{ github.event.client_payload.result_upload_url }}
           RESULT_UPLOAD_TOKEN: ${{ secrets.RESULT_UPLOAD_TOKEN }}
           DOC_ID: ${{ github.event.client_payload.doc_id }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          CALLBACK_TOKEN: ${{ secrets.RESULT_UPLOAD_TOKEN }}
           # If user provided a specific range, honor it; else extractor will process all pages
           PAGE_START: ${{ github.event.client_payload.page_start }}
           PAGE_END: ${{ github.event.client_payload.page_end }}
@@ -175,9 +177,9 @@ jobs:
           find chunks -type f -name "${base}-p*.csv" | sort | head -n 20
       - name: "Preflight: connectivity check (5s timeout)"
         env:
-          RESULT_UPLOAD_URL: ${{ github.event.client_payload.result_upload_url || 'https://search.riskcontrolnigeria.com/api/github/upload-results' }}
+          RESULT_UPLOAD_URL: ${{ github.event.client_payload.result_upload_url || 'https://extraction.peldargconsulting.com/api/github/upload-results' }}
           RESULT_UPLOAD_TOKEN: ${{ secrets.RESULT_UPLOAD_TOKEN }}
-          CALLBACK_URL: ${{ github.event.client_payload.callback_url || 'https://search.riskcontrolnigeria.com/api/github/callback' }}
+          CALLBACK_URL: ${{ github.event.client_payload.callback_url || 'https://extraction.peldargconsulting.com/api/github/callback' }}
         run: |
           set -euo pipefail
           # Helper to run a short POST and only fail on connection errors/timeouts
@@ -205,16 +207,25 @@ jobs:
           fi
           # Callback endpoint
           if [ -n "${CALLBACK_URL:-}" ]; then
-            check_post "${CALLBACK_URL}"
+            if [ -n "${RESULT_UPLOAD_TOKEN:-}" ]; then
+              check_post "${CALLBACK_URL}" -H "Authorization: Bearer ${RESULT_UPLOAD_TOKEN}"
+            else
+              check_post "${CALLBACK_URL}"
+            fi
           fi
       - name: Aggregate and upload (merge CSVs and XLSX only)
         env:
           ORIGINAL_FILENAME: ${{ github.event.client_payload.original_filename }}
-          CALLBACK_URL: ${{ github.event.client_payload.callback_url || 'https://search.riskcontrolnigeria.com/api/github/callback' }}
+          CALLBACK_URL: ${{ github.event.client_payload.callback_url || 'https://extraction.peldargconsulting.com/api/github/callback' }}
           CALLBACK_HMAC_SECRET: ${{ secrets.CALLBACK_HMAC_SECRET }}
-          RESULT_UPLOAD_URL: ${{ github.event.client_payload.result_upload_url || 'https://search.riskcontrolnigeria.com/api/github/upload-results' }}
+          RESULT_UPLOAD_URL: ${{ github.event.client_payload.result_upload_url || 'https://extraction.peldargconsulting.com/api/github/upload-results' }}
           RESULT_UPLOAD_TOKEN: ${{ secrets.RESULT_UPLOAD_TOKEN }}
           DOC_ID: ${{ github.event.client_payload.doc_id }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          CALLBACK_TOKEN: ${{ secrets.RESULT_UPLOAD_TOKEN }}
+          PAGE_START: ${{ github.event.client_payload.page_start }}
+          PAGE_END: ${{ github.event.client_payload.page_end }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested }}
           AGG_SKIP_DOCX: 'true'
           AGG_MAX_DOCX_ROWS: 0
         run: |

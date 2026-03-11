@@ -9,9 +9,9 @@ End‑to‑end pipeline: upload a Convocation PDF in the Laravel app, process it
 - Git and GitHub access
 
 ## Setup
-1. Laravel app lives in `rcs-app` (already scaffolded).
+1. Laravel app lives at the repo root.
 2. Frontend runs as a Blade view with Vite/Tailwind. Entry: `resources/views/convocation.blade.php` and `resources/js/convocation.js`.
-3. Configure environment in `rcs-app/.env`:
+3. Configure environment in `.env`:
    - APP_URL=http://127.0.0.1:8000
    - DB_CONNECTION=mysql
    - DB_HOST=127.0.0.1
@@ -20,8 +20,11 @@ End‑to‑end pipeline: upload a Convocation PDF in the Laravel app, process it
    - DB_USERNAME=root
    - DB_PASSWORD=
    - GITHUB_PAT=your_pat_with_repo_write
-   - EXTRACTOR_CALLBACK_SECRET=your_random_long_secret
-   - EXTRACTOR_BEARER_TOKEN=your_random_long_secret
+   - CALLBACK_HMAC_SECRET=your_random_long_secret
+   - RESULT_UPLOAD_TOKEN=your_random_long_secret
+   # Backward-compatible names also work:
+   # - EXTRACTOR_CALLBACK_SECRET
+   # - EXTRACTOR_BEARER_TOKEN
 4. Link storage and generate app key:
    - php artisan key:generate
    - php artisan storage:link
@@ -29,7 +32,6 @@ End‑to‑end pipeline: upload a Convocation PDF in the Laravel app, process it
    - php artisan migrate
 
 ## Run (Local)
-- cd rcs-app
 - php artisan serve --host=127.0.0.1 --port=8000
 - Open http://127.0.0.1:8000/ (convocation UI is served by Blade)
 
@@ -52,11 +54,11 @@ What it does now:
 - Uploads results back to the app and posts a JSON callback on success.
 
 Required repo secrets:
-- `CALLBACK_HMAC_SECRET` -> must equal `EXTRACTOR_CALLBACK_SECRET` in Laravel `.env`.
-- `RESULT_UPLOAD_TOKEN` -> must equal `EXTRACTOR_BEARER_TOKEN` in Laravel `.env`.
+- `CALLBACK_HMAC_SECRET` -> must equal `CALLBACK_HMAC_SECRET` (or legacy `EXTRACTOR_CALLBACK_SECRET`) in Laravel `.env`.
+- `RESULT_UPLOAD_TOKEN` -> must equal `RESULT_UPLOAD_TOKEN` (or legacy `EXTRACTOR_BEARER_TOKEN`) in Laravel `.env`.
 
 Important app settings:
-- Set `APP_URL` to your live domain (e.g., `https://search.riskcontrolnigeria.com`).
+- Set `APP_URL` to your live domain (e.g., `https://extraction.peldargconsulting.com`).
 - We force HTTPS and use `URL::temporarySignedRoute` for downloads. Expiry is set to 24h for reliability..
 
 Optional knob in client payload:
@@ -76,7 +78,7 @@ If a long PDF run was cancelled or took too long:
 1. Ensure GitHub repo secrets are set:
    - `CALLBACK_HMAC_SECRET` and `RESULT_UPLOAD_TOKEN` must not be empty.
 2. Ensure Laravel `.env` matches:
-   - `EXTRACTOR_CALLBACK_SECRET` and `EXTRACTOR_BEARER_TOKEN` match the GitHub secrets.
+   - `CALLBACK_HMAC_SECRET` and `RESULT_UPLOAD_TOKEN` match the GitHub secrets.
    - `APP_URL` uses your HTTPS live domain; run `php artisan config:clear` then `config:cache`.
 3. Re‑upload the PDF via the UI. The workflow now:
    - Splits into 10‑page chunks (configurable `chunk_size`).

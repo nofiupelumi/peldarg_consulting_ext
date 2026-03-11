@@ -54,7 +54,7 @@ def compute_signature(secret: str, payload: bytes) -> str:
     return hmac.new(secret.encode('utf-8'), payload, hashlib.sha256).hexdigest()
 
 
-def upload_results(upload_url: str, token: str, doc_id: str, paths: Dict[str,str], summary: Dict) -> None:
+def upload_results(upload_url: str, token: str, doc_id: str, request_id: str, paths: Dict[str,str], summary: Dict) -> None:
     if not upload_url:
         print('[agg] RESULT_UPLOAD_URL empty; skipping upload to app')
         return
@@ -64,7 +64,7 @@ def upload_results(upload_url: str, token: str, doc_id: str, paths: Dict[str,str
             p = paths.get(key)
             if p and os.path.exists(p):
                 files[key] = (os.path.basename(p), open(p, 'rb'), 'application/octet-stream')
-        data = { 'doc_id': doc_id or '', 'summary': json.dumps(summary) }
+        data = { 'doc_id': doc_id or '', 'request_id': request_id or '', 'summary': json.dumps(summary) }
         headers = {}
         if token:
             headers['Authorization'] = f"Bearer {token}"
@@ -83,6 +83,11 @@ def main():
     result_upload_url = os.getenv('RESULT_UPLOAD_URL', '')
     result_upload_token = os.getenv('RESULT_UPLOAD_TOKEN', '')
     doc_id = os.getenv('DOC_ID', '')
+    request_id = os.getenv('REQUEST_ID', '').strip()
+    callback_token = (os.getenv('CALLBACK_TOKEN', '').strip() or result_upload_token)
+    page_start_env = os.getenv('PAGE_START', '').strip()
+    page_end_env = os.getenv('PAGE_END', '').strip()
+    pages_requested_env = os.getenv('PAGES_REQUESTED', '').strip()
 
     base = os.path.splitext(os.path.basename(original_filename))[0]
     pattern = os.path.join(chunks_dir, f"{base}-p*/*.csv")
@@ -130,21 +135,30 @@ def main():
 
     summary = {
         'status': 'success',
-        'counts': { 'rows': int(after) },
+        'counts': {
+            'rows': int(after),
+            'pages_processed': int((int(page_end_env) - int(page_start_env) + 1) if page_start_env and page_end_env else (int(pages_requested_env) if pages_requested_env else 0)),
+            'pages_with_results': int((int(page_end_env) - int(page_start_env) + 1) if page_start_env and page_end_env and after > 0 else ((int(pages_requested_env) if pages_requested_env else 0) if after > 0 else 0)),
+        },
         'chunks': len(frames),
         'files': paths,
         'filename': original_filename,
+        'doc_id': doc_id,
+        'request_id': request_id,
     }
 
     # Upload to app
     if not result_upload_token:
         print('[agg] RESULT_UPLOAD_TOKEN is empty; upload may be rejected by app')
-    upload_results(result_upload_url, result_upload_token, doc_id, paths, summary)
+    upload_results(result_upload_url, result_upload_token, doc_id, request_id, paths, summary)
 
     # Callback to app
     if callback_url:
         payload = json.dumps(summary).encode('utf-8')
         headers = { 'Content-Type': 'application/json' }
+        if callback_token:
+            headers['Authorization'] = f"Bearer {callback_token}"
+            headers['X-Extractor-Token'] = callback_token
         if callback_secret:
             headers['X-Extractor-Signature'] = compute_signature(callback_secret, payload)
         try:

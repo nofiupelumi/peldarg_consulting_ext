@@ -1,9 +1,33 @@
-# Dependencies
-node_modules/
-venv/
-.venv/
+# Laravel / PHP
+*.log
+.DS_Store
 .env
 .env.*
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.fleet
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/vendor
+/storage/*.key
+/storage/pail
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# Node
+/node_modules
+/public/hot
+/public/storage
+# Include Vite build output in version control
+!/public/build
+!/public/build/**
 
 # Python
 __pycache__/
@@ -12,30 +36,23 @@ __pycache__/
 *.pyd
 *.sqlite3
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-logs/
-*.log
+# Virtual envs
+venv/
+.venv/
 
-# Build
-build/
-dist/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# PM2
-.pm2/
-
-# Wrangler/Cloudflare (if present)
-.wrangler/
+# Build (repo root only; do not ignore Laravel public/build)
+/build/
+/dist/
 
 # Artifacts
 outputs/
 
 # Test PDFs (keep only in local testing)
 *.pdf
-!rcs-app/public/*.pdf
+!public/*.pdf
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
