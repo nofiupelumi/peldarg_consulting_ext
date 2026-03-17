@@ -20,6 +20,13 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
     Route::get('/dashboard', function () {
         $user = User::findOrFail((int) session('user_id'));
         $settings = AppSetting::current();
+        $allApiTiers = ['paid_1', 'paid_2', 'paid_3'];
+        $allowedApiTiers = (bool) $user->is_admin
+            ? $allApiTiers
+            : array_values(array_intersect($allApiTiers, (array) ($user->allowed_api_tiers ?? [])));
+        if ($allowedApiTiers === []) {
+            $allowedApiTiers = ['paid_1'];
+        }
 
         $now = Carbon::now();
         $uploadsToday = Document::query()
@@ -45,6 +52,8 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
             'uploadsToday' => (int) $uploadsToday,
             'uploadsThisMonth' => (int) $uploadsThisMonth,
             'successfulExtractsTotal' => (int) $successfulExtractsTotal,
+            'availableApiTiers' => $allowedApiTiers,
+            'defaultApiTier' => $allowedApiTiers[0],
         ]);
     })->name('dashboard');
 

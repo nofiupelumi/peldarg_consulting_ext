@@ -10,6 +10,7 @@ class Document extends Model
     protected $fillable = [
         'user_id',
         'request_id',
+        'api_tier',
         'filename',
         'path',
         'session',

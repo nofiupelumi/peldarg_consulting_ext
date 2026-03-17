@@ -74,17 +74,22 @@
             <button id="refreshUsers" class="text-sm px-3 py-2 rounded-lg border border-gray-300">Refresh</button>
         </div>
 
-        <form id="createUserForm" class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-4" method="POST" action="javascript:void(0);" onsubmit="return false;">
+        <form id="createUserForm" class="grid grid-cols-1 md:grid-cols-7 gap-3 mt-4" method="POST" action="javascript:void(0);" onsubmit="return false;">
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="company_name" placeholder="Company name" required />
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="email" type="email" placeholder="Email" required />
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="password" type="password" placeholder="Password (optional)" />
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="credit_cap" type="number" min="0" step="1" placeholder="Credit cap (0=none)" />
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="credit_balance" type="number" min="0" step="1" placeholder="Starting credits" />
+            <select class="rounded-lg border border-gray-300 px-3 py-2" name="allowed_api_tiers" multiple size="3" title="Allowed API tiers">
+                <option value="paid_1" selected>PAID TIER 1</option>
+                <option value="paid_2">PAID TIER 2</option>
+                <option value="paid_3">PAID TIER 3</option>
+            </select>
             <label class="inline-flex items-center gap-2 text-sm px-2">
                 <input type="checkbox" name="is_admin" value="1" />
                 Admin
             </label>
-            <div class="md:col-span-6 flex items-center gap-3">
+            <div class="md:col-span-7 flex items-center gap-3">
                 <button class="px-4 py-2 rounded-lg font-semibold" style="background: var(--peldarg-primary-gold); color: var(--peldarg-primary-navy);" type="submit">Create User</button>
                 <span id="createUserMsg" class="text-sm"></span>
             </div>
@@ -100,6 +105,7 @@
                     <th class="text-left p-2 border-b">Balance</th>
                     <th class="text-left p-2 border-b">Cap</th>
                     <th class="text-left p-2 border-b">Status</th>
+                    <th class="text-left p-2 border-b">Allowed API tiers</th>
                     <th class="text-left p-2 border-b">Actions</th>
                 </tr>
                 </thead>

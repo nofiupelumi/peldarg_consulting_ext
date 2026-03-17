@@ -447,6 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const fd = new FormData()
     fd.append('file', f)
     if ($('#session')?.value) fd.append('session', $('#session').value)
+    if ($('#api_tier')?.value) fd.append('api_tier', $('#api_tier').value)
     if (sp > 0) fd.append('start_page', sp)
     if (ep > 0) fd.append('end_page', ep)
     
@@ -593,6 +594,7 @@ function renderDocs(list){
       tdLink(d.xlsx_download, 'xlsx'),
       td(new Date(d.created_at).toLocaleString()),
       td(d.failed_reason || ''),
+      td(d.api_tier || ''),
       tdDelete(d.id)
     )
     tbody.appendChild(tr)

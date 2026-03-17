@@ -94,6 +94,17 @@
                     <input id="session" name="session" type="text" placeholder="e.g. 2021/2022" class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
                     <small class="text-gray-500 text-xs">If not provided, will be auto-detected from PDF</small>
                 </div>
+                <div class="flex flex-col gap-2">
+                    <label for="api_tier" class="font-medium">Gemini API Key Tier</label>
+                    <select id="api_tier" name="api_tier" class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" required>
+                        @foreach(($availableApiTiers ?? ['paid_1']) as $tier)
+                            <option value="{{ $tier }}" {{ ($defaultApiTier ?? 'paid_1') === $tier ? 'selected' : '' }}>
+                                {{ strtoupper(str_replace('_', ' ', $tier)) }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small class="text-gray-500 text-xs">Available tiers are assigned by admin.</small>
+                </div>
                 <div class="flex gap-3">
                     <div class="flex-1 flex flex-col gap-2">
                         <label for="page_start" class="font-medium">Start Page (optional)</label>
@@ -140,6 +151,7 @@
                             <th class="text-left p-2 border-b">XLSX</th>
                             <th class="text-left p-2 border-b">Created</th>
                             <th class="text-left p-2 border-b">Failure reason</th>
+                            <th class="text-left p-2 border-b">API tier</th>
                             <th class="text-left p-2 border-b">Actions</th>
                         </tr>
                     </thead>

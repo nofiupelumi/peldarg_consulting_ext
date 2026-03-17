@@ -16,6 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 class DocumentController extends Controller
 {
+    private const API_TIERS = ['paid_1', 'paid_2', 'paid_3'];
+
     public function __construct(private CreditService $creditService)
     {
     }
@@ -30,9 +32,24 @@ class DocumentController extends Controller
             'session' => 'nullable|string',
             'start_page' => 'nullable|integer|min:1',
             'end_page' => 'nullable|integer|min:1|gte:start_page',
+            'api_tier' => 'required|string|in:paid_1,paid_2,paid_3',
         ]);
         $userId = (int) $req->session()->get('user_id');
         $user = User::findOrFail($userId);
+
+        $selectedApiTier = strtolower(trim((string) $req->input('api_tier', '')));
+        $allowedApiTiers = (bool) $user->is_admin
+            ? self::API_TIERS
+            : array_values(array_intersect(self::API_TIERS, (array) ($user->allowed_api_tiers ?? [])));
+        if ($allowedApiTiers === []) {
+            $allowedApiTiers = ['paid_1'];
+        }
+
+        if (!in_array($selectedApiTier, $allowedApiTiers, true)) {
+            throw ValidationException::withMessages([
+                'api_tier' => 'Selected API tier is not permitted for your account.',
+            ]);
+        }
 
         $file = $req->file('file');
 
@@ -74,6 +91,7 @@ class DocumentController extends Controller
         $doc = Document::create([
             'user_id' => $user->id,
             'request_id' => $requestId,
+            'api_tier' => $selectedApiTier,
             'filename' => $file->getClientOriginalName(),
             'path' => $path,
             'session' => $req->input('session'),
@@ -108,6 +126,7 @@ class DocumentController extends Controller
                 'result_upload_url' => url(route('github.uploadResults', [], false)),
                 'doc_id' => (string)$doc->id,
                 'request_id' => (string)$doc->request_id,
+                'api_tier' => $selectedApiTier,
                 'pages_requested' => $pagesRequested,
                 'page_start' => $effectiveStart,
                 'page_end' => $effectiveEnd,
@@ -125,6 +144,7 @@ class DocumentController extends Controller
             'credits_reserved' => $doc->credits_reserved,
             'credit_balance' => (int) $user->fresh()->credit_balance,
             'pages_requested' => (int) $doc->pages_requested,
+            'api_tier' => (string) $doc->api_tier,
             'request_id' => (string) $doc->request_id,
         ]);
     }

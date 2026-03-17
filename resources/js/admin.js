@@ -2,6 +2,7 @@ const API = {
   users: '/api/admin/users',
   createUser: '/api/admin/users',
   resetPassword: (id) => `/api/admin/users/${id}/reset-password`,
+  updateUserApiTiers: (id) => `/api/admin/users/${id}/api-tiers`,
   addCredits: (id) => `/api/admin/users/${id}/credits/add`,
   deductCredits: (id) => `/api/admin/users/${id}/credits/deduct`,
   setCap: (id) => `/api/admin/users/${id}/credit-cap`,
@@ -19,6 +20,8 @@ const API = {
   settingsGet: '/api/admin/settings',
   settingsUpdate: '/api/admin/settings',
 }
+
+const API_TIERS = ['paid_1', 'paid_2', 'paid_3']
 
 function $(sel) { return document.querySelector(sel) }
 function el(tag, attrs = {}) { const e = document.createElement(tag); Object.assign(e, attrs); return e }
@@ -73,6 +76,16 @@ function tdHtml(html) {
 
 function fmtDate(v) {
   try { return v ? new Date(v).toLocaleString() : '' } catch { return '' }
+}
+
+function normalizeTiers(raw) {
+  if (!Array.isArray(raw)) return []
+  const lower = raw.map((v) => String(v || '').trim().toLowerCase())
+  return API_TIERS.filter((tier) => lower.includes(tier))
+}
+
+function tierLabel(tier) {
+  return String(tier || '').toUpperCase().replace(/_/g, ' ')
 }
 
 // ---------------------------------------------------------------------------
@@ -205,8 +218,46 @@ function renderUsers(list) {
 
     row2.append(creditInput, addBtn, deductBtn)
 
-    wrap.append(row1, row2, resetBtn)
+    const row3 = document.createElement('div')
+    row3.className = 'flex items-center gap-2 flex-wrap'
+
+    const tierSelect = el('select', { multiple: true, size: 3 })
+    tierSelect.className = 'rounded border border-gray-300 px-2 py-1 text-xs min-w-[130px]'
+
+    const currentTiers = normalizeTiers(u.allowed_api_tiers)
+    for (const tier of API_TIERS) {
+      const opt = el('option', { value: tier, textContent: tierLabel(tier) })
+      if (currentTiers.includes(tier)) opt.selected = true
+      tierSelect.appendChild(opt)
+    }
+
+    const saveTierBtn = el('button', { type: 'button', textContent: 'Save tiers' })
+    saveTierBtn.className = 'text-sm underline'
+    saveTierBtn.onclick = async () => {
+      const picked = Array.from(tierSelect.selectedOptions).map((o) => o.value)
+      if (picked.length < 1) {
+        alert('Select at least one API tier')
+        return
+      }
+
+      try {
+        await apiFetch(API.updateUserApiTiers(u.id), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ allowed_api_tiers: picked }),
+        })
+        await loadUsers(); await loadAudit()
+      } catch (e) {
+        alert(e.message || 'Failed to save API tiers')
+      }
+    }
+
+    row3.append(tierSelect, saveTierBtn)
+
+    wrap.append(row1, row2, row3, resetBtn)
     actions.appendChild(wrap)
+
+    const tierCell = td(normalizeTiers(u.allowed_api_tiers).map(tierLabel).join(', '))
 
     tr.append(
       td(u.id),
@@ -215,6 +266,7 @@ function renderUsers(list) {
       td(u.credit_balance),
       td(u.credit_cap),
       td(u.status),
+      tierCell,
       actions,
     )
 
@@ -243,6 +295,11 @@ async function createUser(form) {
     credit_cap: fd.get('credit_cap') || 0,
     credit_balance: fd.get('credit_balance') || 0,
     is_admin: fd.get('is_admin') ? 1 : 0,
+    allowed_api_tiers: normalizeTiers(fd.getAll('allowed_api_tiers')),
+  }
+
+  if (!payload.allowed_api_tiers.length) {
+    payload.allowed_api_tiers = ['paid_1']
   }
 
   if (password) payload.password = password

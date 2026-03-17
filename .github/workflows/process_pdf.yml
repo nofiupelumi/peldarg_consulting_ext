@@ -91,12 +91,39 @@ jobs:
         with:
           name: source-pdf
           path: .
+      - name: Resolve Gemini API key by tier
+        env:
+          API_TIER: ${{ github.event.client_payload.api_tier || 'paid_1' }}
+          GEMINI_API_KEY_PAID_1: ${{ secrets.GEMINI_API_KEY_PAID_1 }}
+          GEMINI_API_KEY_PAID_2: ${{ secrets.GEMINI_API_KEY_PAID_2 }}
+          GEMINI_API_KEY_PAID_3: ${{ secrets.GEMINI_API_KEY_PAID_3 }}
+        run: |
+          set -euo pipefail
+          tier="${API_TIER,,}"
+          case "$tier" in
+            paid_2)
+              key="$GEMINI_API_KEY_PAID_2"
+              ;;
+            paid_3)
+              key="$GEMINI_API_KEY_PAID_3"
+              ;;
+            *)
+              tier="paid_1"
+              key="$GEMINI_API_KEY_PAID_1"
+              ;;
+          esac
+          if [ -z "$key" ]; then
+            echo "Selected Gemini key is empty for tier: $tier"
+            exit 1
+          fi
+          echo "API_TIER=$tier" >> "$GITHUB_ENV"
+          echo "GEMINI_API_KEY=$key" >> "$GITHUB_ENV"
       - name: Extract (agent)
         env:
           SOURCE_FILE: source.pdf
           ORIGINAL_FILENAME: ${{ github.event.client_payload.original_filename }}
           SESSION: ${{ github.event.client_payload.session }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY_PAID }}
+          GEMINI_API_KEY: ${{ env.GEMINI_API_KEY }}
           CALLBACK_URL: ${{ github.event.client_payload.callback_url }}
           CALLBACK_HMAC_SECRET: ${{ secrets.CALLBACK_HMAC_SECRET }}
           RESULT_UPLOAD_URL: ${{ github.event.client_payload.result_upload_url }}

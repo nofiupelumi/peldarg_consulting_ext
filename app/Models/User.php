@@ -27,6 +27,7 @@ class User extends Authenticatable
         'credit_balance',
         'credit_cap',
         'must_change_password',
+        'allowed_api_tiers',
     ];
 
     /**
@@ -51,6 +52,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
             'must_change_password' => 'boolean',
+            'allowed_api_tiers' => 'array',
         ];
     }
 }

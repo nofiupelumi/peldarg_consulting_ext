@@ -63,8 +63,14 @@ What it does now:
 - Uploads results back to the app and posts a JSON callback on success.
 
 Required repo secrets:
+- `GEMINI_API_KEY_PAID_1` -> Gemini key for `paid_1` tier.
+- `GEMINI_API_KEY_PAID_2` -> Gemini key for `paid_2` tier.
+- `GEMINI_API_KEY_PAID_3` -> Gemini key for `paid_3` tier.
 - `CALLBACK_HMAC_SECRET` -> must equal `CALLBACK_HMAC_SECRET` (or legacy `EXTRACTOR_CALLBACK_SECRET`) in Laravel `.env`.
 - `RESULT_UPLOAD_TOKEN` -> must equal `RESULT_UPLOAD_TOKEN` (or legacy `EXTRACTOR_BEARER_TOKEN`) in Laravel `.env`.
+
+Workflow payload key:
+- `api_tier` -> one of `paid_1`, `paid_2`, `paid_3`. If omitted, defaults to `paid_1`.
 
 Important app settings:
 - Set `APP_URL` to your live domain (e.g., `https://extraction.peldargconsulting.com`).

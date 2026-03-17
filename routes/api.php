@@ -41,6 +41,7 @@ Route::middleware(['web', 'App\Http\Middleware\CheckAuth', 'App\Http\Middleware\
     Route::get('/admin/users', [AdminUserController::class, 'index']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::post('/admin/users/{user}/reset-password', [AdminUserController::class, 'resetPassword']);
+    Route::post('/admin/users/{user}/api-tiers', [AdminUserController::class, 'updateApiTiers']);
     Route::post('/admin/users/{user}/credits/add', [AdminCreditController::class, 'add']);
     Route::post('/admin/users/{user}/credits/deduct', [AdminCreditController::class, 'deduct']);
     Route::post('/admin/users/{user}/credit-cap', [AdminCreditController::class, 'setCap']);
