@@ -1,32 +1,41 @@
-# Laravel / PHP
-*.log
+# OS / editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.fleet/
+.zed/
+
+# Environment / secrets
 .env
 .env.*
+!.env.example
 .env.backup
 .env.production
-.phpactor.json
-.phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
-/auth.json
-/vendor
+auth.json
+
+# Laravel / PHP
+/vendor/
 /storage/*.key
-/storage/pail
-Homestead.json
-Homestead.yaml
-Thumbs.db
+/storage/pail/
+/.phpunit.cache/
+.phpunit.result.cache
+.phpactor.json
+
+# Logs
+*.log
+/logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Node
-/node_modules
+/node_modules/
 /public/hot
 /public/storage
-# Include Vite build output in version control
-!/public/build
+
+# Keep built Vite assets in git (current project behavior)
+!/public/build/
 !/public/build/**
 
 # Python
@@ -34,25 +43,17 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.sqlite3
-
-# Virtual envs
-venv/
 .venv/
+venv/
 
-# Build (repo root only; do not ignore Laravel public/build)
+# Build / outputs
 /build/
 /dist/
-
-# Artifacts
 outputs/
 
-# Test PDFs (keep only in local testing)
+# Local PDFs (except public sample PDFs)
 *.pdf
 !public/*.pdf
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-logs/
+# Local scratch copy that should not be committed
+/peldargconsulting-extractioncredit_app/
