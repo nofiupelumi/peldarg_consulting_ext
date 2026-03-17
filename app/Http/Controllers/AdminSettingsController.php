@@ -5,9 +5,24 @@ namespace App\Http\Controllers;
 use App\Models\AppSetting;
 use App\Models\CreditAuditLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 
 class AdminSettingsController extends Controller
 {
+    private function notifyRecipients(): array
+    {
+        $raw = (string) config('services.contact_notify_to', '');
+        $parts = array_map('trim', preg_split('/[;,]+/', $raw) ?: []);
+        $parts = array_values(array_filter($parts, fn ($v) => $v !== ''));
+
+        // Safe default.
+        if (count($parts) === 0) {
+            $parts = ['peldargconsulting@gmail.com'];
+        }
+
+        return $parts;
+    }
+
     public function show()
     {
         return AppSetting::current();
@@ -45,6 +60,18 @@ class AdminSettingsController extends Controller
             'user_agent' => substr((string) $request->userAgent(), 0, 255),
             'request_id' => null,
         ]);
+
+        try {
+            $recipients = $this->notifyRecipients();
+            $newValues = $settings->only(['unit_price_usd', 'fx_rate_ngn', 'max_upload_mb', 'admin_2fa_required']);
+
+            Mail::raw(
+                "Admin settings updated.\n\nOld:\n" . json_encode($old) . "\n\nNew:\n" . json_encode($newValues),
+                fn ($message) => $message->to($recipients)->subject('Peldarg Extractor Settings Updated')
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['ok' => true, 'settings' => $settings]);
     }

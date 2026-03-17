@@ -23,18 +23,22 @@ class AdminUserController extends Controller
         $payload = $request->validate([
             'company_name' => 'required|string|max:255|unique:users,company_name',
             'email' => 'required|email|max:255|unique:users,email',
+            'password' => 'nullable|string|min:8|max:255',
             'is_admin' => 'nullable|boolean',
             'credit_cap' => 'nullable|integer|min:0',
             'credit_balance' => 'nullable|integer|min:0',
         ]);
 
-        $tempPassword = Str::password(12);
+        $initialPassword = trim((string) ($payload['password'] ?? ''));
+        if ($initialPassword === '') {
+            $initialPassword = Str::password(12);
+        }
 
         $user = User::create([
             'name' => $payload['company_name'],
             'company_name' => $payload['company_name'],
             'email' => $payload['email'],
-            'password' => Hash::make($tempPassword),
+            'password' => Hash::make($initialPassword),
             'is_admin' => (bool) ($payload['is_admin'] ?? false),
             'status' => 'active',
             'credit_cap' => (int) ($payload['credit_cap'] ?? 0),
@@ -43,8 +47,9 @@ class AdminUserController extends Controller
             'email_verified_at' => now(),
         ]);
 
+        $loginUrl = url('/login');
         Mail::raw(
-            "Your Peldarg Extraction account is ready.\n\nCompany: {$user->company_name}\nLogin: https://extraction.peldargconsulting.com/login\nEmail: {$user->email}\nTemporary Password: {$tempPassword}\n\nPlease sign in and change your password immediately.",
+            "Your Peldarg Extraction account is ready.\n\nCompany: {$user->company_name}\nLogin: {$loginUrl}\nEmail: {$user->email}\nPassword: {$initialPassword}\n\nPlease sign in and change your password immediately.",
             fn ($message) => $message->to($user->email)->subject('Peldarg Extractor Login Credentials')
         );
 
@@ -66,13 +71,14 @@ class AdminUserController extends Controller
             $user->status = 'active';
         }
 
-        $tempPassword = Str::password(12);
-        $user->password = Hash::make($tempPassword);
+        $temporaryPassword = Str::password(12);
+        $user->password = Hash::make($temporaryPassword);
         $user->must_change_password = true;
         $user->save();
 
+        $loginUrl = url('/login');
         Mail::raw(
-            "Your password has been reset by Peldarg admin.\n\nCompany: {$user->company_name}\nLogin: https://extraction.peldargconsulting.com/login\nEmail: {$user->email}\nTemporary Password: {$tempPassword}\n\nPlease sign in and change your password immediately.",
+            "Your password has been reset by Peldarg admin.\n\nCompany: {$user->company_name}\nLogin: {$loginUrl}\nEmail: {$user->email}\nTemporary Password: {$temporaryPassword}\n\nPlease sign in and change your password immediately.",
             fn ($message) => $message->to($user->email)->subject('Peldarg Extractor Password Reset')
         );
 

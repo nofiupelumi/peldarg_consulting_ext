@@ -15,6 +15,20 @@ class CreditInvoiceController extends Controller
     {
     }
 
+    private function notifyRecipients(): array
+    {
+        $raw = (string) config('services.contact_notify_to', '');
+        $parts = array_map('trim', preg_split('/[;,]+/', $raw) ?: []);
+        $parts = array_values(array_filter($parts, fn ($v) => $v !== ''));
+
+        // Backward compatible default.
+        if (count($parts) === 0) {
+            $parts = ['peldargconsulting@gmail.com'];
+        }
+
+        return $parts;
+    }
+
     public function index(Request $request)
     {
         $userId = (int) $request->session()->get('user_id');
@@ -53,10 +67,15 @@ class CreditInvoiceController extends Controller
             'status' => 'pending',
         ]);
 
-        Mail::raw(
-            "New credit invoice submitted.\n\nInvoice: {$invoice->invoice_number}\nUser ID: {$invoice->user_id}\nRequested Credits: {$invoice->requested_credits}\nAmount USD: {$invoice->requested_amount_usd}\nPayment Ref: {$invoice->payment_reference}\nProof Path: {$invoice->proof_path}",
-            fn ($message) => $message->to('peldargconsulting@gmail.com')->subject('New Credit Top-up Invoice')
-        );
+        try {
+            $recipients = $this->notifyRecipients();
+            Mail::raw(
+                "New credit top-up request submitted.\n\nInvoice: {$invoice->invoice_number}\nUser ID: {$invoice->user_id}\nRequested Credits: {$invoice->requested_credits}\nAmount USD: {$invoice->requested_amount_usd}\nPayment Ref: {$invoice->payment_reference}\nProof Path: {$invoice->proof_path}\nStatus: {$invoice->status}",
+                fn ($message) => $message->to($recipients)->subject('New Credit Top-up Invoice')
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json($invoice, 201);
     }
@@ -65,10 +84,19 @@ class CreditInvoiceController extends Controller
     {
         $status = $request->query('status');
 
-        return CreditInvoice::query()
+        $list = CreditInvoice::query()
+            ->with(['user:id,company_name,name'])
             ->when($status, fn ($q) => $q->where('status', $status))
             ->latest()
             ->get();
+
+        $list->transform(function ($inv) {
+            $inv->user_company_name = $inv->user?->company_name;
+            $inv->user_name = $inv->user?->name;
+            return $inv;
+        });
+
+        return $list;
     }
 
     public function approve(Request $request, CreditInvoice $invoice)
@@ -110,6 +138,16 @@ class CreditInvoiceController extends Controller
             );
         });
 
+        try {
+            $recipients = $this->notifyRecipients();
+            Mail::raw(
+                "Credit invoice approved.\n\nInvoice: {$invoice->invoice_number}\nUser ID: {$invoice->user_id}\nCredits: {$invoice->requested_credits}\nAmount USD: {$invoice->requested_amount_usd}\nAdmin note: {$invoice->admin_note}\nReviewed by (user id): {$invoice->reviewed_by_user_id}\nReviewed at: {$invoice->reviewed_at}",
+                fn ($message) => $message->to($recipients)->subject('Credit Top-up Invoice Approved')
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return response()->json(['ok' => true]);
     }
 
@@ -125,6 +163,16 @@ class CreditInvoiceController extends Controller
         $invoice->reviewed_by_user_id = (int) $request->session()->get('user_id');
         $invoice->reviewed_at = now();
         $invoice->save();
+
+        try {
+            $recipients = $this->notifyRecipients();
+            Mail::raw(
+                "Credit invoice rejected.\n\nInvoice: {$invoice->invoice_number}\nUser ID: {$invoice->user_id}\nCredits: {$invoice->requested_credits}\nAmount USD: {$invoice->requested_amount_usd}\nAdmin note: {$invoice->admin_note}\nReviewed by (user id): {$invoice->reviewed_by_user_id}\nReviewed at: {$invoice->reviewed_at}",
+                fn ($message) => $message->to($recipients)->subject('Credit Top-up Invoice Rejected')
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['ok' => true]);
     }

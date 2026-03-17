@@ -30,10 +30,19 @@ End‑to‑end pipeline: upload a Convocation PDF in the Laravel app, process it
    - php artisan storage:link
 5. Migrate DB:
    - php artisan migrate
+6. Seed default records (includes admin user):
+   - php artisan db:seed
+
+## Default Admin (Local)
+After running `php artisan db:seed`, a default admin user is created:
+- Email: admin@peldargconsulting.com
+- Password: Admin@12345
 
 ## Run (Local)
 - php artisan serve --host=127.0.0.1 --port=8000
-- Open http://127.0.0.1:8000/ (convocation UI is served by Blade)
+- Open http://127.0.0.1:8000/ (public landing page)
+- Log in at http://127.0.0.1:8000/login
+- App UI is served at http://127.0.0.1:8000/dashboard (after login)
 
 ## Endpoints
 - POST /api/upload

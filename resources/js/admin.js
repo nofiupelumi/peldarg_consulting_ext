@@ -86,7 +86,7 @@ async function loadSettings() {
     if ($('#fx_rate_ngn')) $('#fx_rate_ngn').value = s.fx_rate_ngn
     if ($('#max_upload_mb')) $('#max_upload_mb').value = s.max_upload_mb
     if ($('#admin_2fa_required')) $('#admin_2fa_required').checked = !!s.admin_2fa_required
-    setMsg(msg, 'Loaded', 'text-green-700')
+    setMsg(msg, 'Loaded', 'text-amber-700')
     setTimeout(() => setMsg(msg, ''), 1200)
   } catch (e) {
     setMsg(msg, e.message || 'Failed to load settings', 'text-red-600')
@@ -111,7 +111,7 @@ async function saveSettings() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    setMsg(msg, 'Saved', 'text-green-700')
+    setMsg(msg, 'Saved', 'text-amber-700')
   } catch (e) {
     setMsg(msg, e.message || 'Failed to save', 'text-red-600')
   } finally {
@@ -235,6 +235,8 @@ async function createUser(form) {
   const msg = $('#createUserMsg')
   const fd = new FormData(form)
 
+  const password = String(fd.get('password') || '').trim()
+
   const payload = {
     company_name: fd.get('company_name'),
     email: fd.get('email'),
@@ -242,6 +244,8 @@ async function createUser(form) {
     credit_balance: fd.get('credit_balance') || 0,
     is_admin: fd.get('is_admin') ? 1 : 0,
   }
+
+  if (password) payload.password = password
 
   try {
     setMsg(msg, 'Creating…')
@@ -251,7 +255,7 @@ async function createUser(form) {
       body: JSON.stringify(payload),
     })
     form.reset()
-    setMsg(msg, 'Created (email sent)', 'text-green-700')
+    setMsg(msg, 'Created (email sent)', 'text-amber-700')
     await loadUsers(); await loadAudit();
   } catch (e) {
     const errors = e?.data?.errors
@@ -309,7 +313,7 @@ function renderInvoices(list) {
 
     tr.append(
       td(inv.invoice_number),
-      td(inv.user_id),
+      td(inv.user_company_name || inv.user_name || inv.user_id),
       td(inv.requested_credits),
       td(inv.requested_amount_usd),
       td(inv.status),
@@ -377,7 +381,7 @@ function renderDocs(list) {
 
     tr.append(
       td(d.id),
-      td(d.user_id),
+      td(d.user_company_name || d.user_name || d.user_id),
       td(d.filename),
       td(d.status),
       td(`${d.credit_status || ''} (res ${d.credits_reserved || 0})`),
@@ -413,7 +417,7 @@ function renderLedger(list) {
     const tr = document.createElement('tr')
     tr.append(
       td(l.id),
-      td(l.user_id),
+      td(l.user_company_name || l.user_name || l.user_id),
       td(l.action_type),
       td(l.credits),
       td(l.balance_before),
@@ -448,8 +452,8 @@ function renderAudit(list) {
     tr.append(
       td(a.id),
       td(a.event_key),
-      td(a.actor_user_id ?? ''),
-      td(a.target_user_id ?? ''),
+      td(a.actor_company_name || a.actor_name || a.actor_user_id || ''),
+      td(a.target_company_name || a.target_name || a.target_user_id || ''),
       td(entity),
       td(fmtDate(a.created_at)),
     )

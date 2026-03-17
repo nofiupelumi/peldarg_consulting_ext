@@ -74,16 +74,17 @@
             <button id="refreshUsers" class="text-sm px-3 py-2 rounded-lg border border-gray-300">Refresh</button>
         </div>
 
-        <form id="createUserForm" class="grid grid-cols-1 md:grid-cols-5 gap-3 mt-4" method="POST" action="javascript:void(0);" onsubmit="return false;">
+        <form id="createUserForm" class="grid grid-cols-1 md:grid-cols-6 gap-3 mt-4" method="POST" action="javascript:void(0);" onsubmit="return false;">
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="company_name" placeholder="Company name" required />
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="email" type="email" placeholder="Email" required />
+            <input class="rounded-lg border border-gray-300 px-3 py-2" name="password" type="password" placeholder="Password (optional)" />
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="credit_cap" type="number" min="0" step="1" placeholder="Credit cap (0=none)" />
-            <input class="rounded-lg border bordergray-300 border px-3 py-2" name="credit_balance" type="number" min="0" step="1" placeholder="Starting credits" />
+            <input class="rounded-lg border border-gray-300 px-3 py-2" name="credit_balance" type="number" min="0" step="1" placeholder="Starting credits" />
             <label class="inline-flex items-center gap-2 text-sm px-2">
                 <input type="checkbox" name="is_admin" value="1" />
                 Admin
             </label>
-            <div class="md:col-span-5 flex items-center gap-3">
+            <div class="md:col-span-6 flex items-center gap-3">
                 <button class="px-4 py-2 rounded-lg font-semibold" style="background: var(--peldarg-primary-gold); color: var(--peldarg-primary-navy);" type="submit">Create User</button>
                 <span id="createUserMsg" class="text-sm"></span>
             </div>

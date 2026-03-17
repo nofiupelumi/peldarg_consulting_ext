@@ -48,4 +48,6 @@ return [
         'token' => env('RESULT_UPLOAD_TOKEN', env('EXTRACTOR_BEARER_TOKEN')),
     ],
 
+    'contact_notify_to' => env('CONTACT_NOTIFY_TO'),
+
 ];

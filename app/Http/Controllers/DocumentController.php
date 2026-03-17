@@ -165,12 +165,17 @@ class DocumentController extends Controller
 
         $docs = Document::query()
             ->when(!$isAdmin, fn ($q) => $q->where('user_id', $userId))
+            ->when($isAdmin, fn ($q) => $q->with(['user:id,company_name,name']))
             ->latest()
             ->get();
         // Attach signed download links for CSV/XLSX if present
         $docs->transform(function($d){
             $d->csv_download = $d->csv_url ? URL::temporarySignedRoute('documents.downloadOutput', now()->addHours(12), ['doc' => $d->id, 'type' => 'csv']) : null;
             $d->xlsx_download = $d->xlsx_url ? URL::temporarySignedRoute('documents.downloadOutput', now()->addHours(12), ['doc' => $d->id, 'type' => 'xlsx']) : null;
+            if ((bool) session('is_admin')) {
+                $d->user_company_name = $d->user?->company_name;
+                $d->user_name = $d->user?->name;
+            }
             return $d;
         });
         return $docs;

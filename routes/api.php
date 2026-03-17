@@ -10,6 +10,8 @@ use App\Http\Controllers\CreditInvoiceController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\GithubController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\UserCreditController;
+use App\Http\Controllers\UserAccountController;
 
 // These routes rely on session-based auth (CheckAuth uses Session::get('authenticated')).
 // API routes do not include session middleware by default, so we explicitly enable the `web`
@@ -19,8 +21,14 @@ Route::middleware(['web', 'App\Http\Middleware\CheckAuth'])->group(function () {
     Route::get('/documents', [DocumentController::class, 'index']);
     Route::delete('/documents/{doc}', [DocumentController::class, 'delete']);
 
+    Route::get('/credit-summary', [UserCreditController::class, 'summary']);
+    Route::get('/credit-ledger', [UserCreditController::class, 'ledger']);
+
     Route::get('/credit-invoices', [CreditInvoiceController::class, 'index']);
     Route::post('/credit-invoices', [CreditInvoiceController::class, 'store']);
+
+    Route::post('/account/profile', [UserAccountController::class, 'profile']);
+    Route::post('/account/password', [UserAccountController::class, 'password']);
 });
 
 Route::middleware(['web', 'App\Http\Middleware\CheckAuth', 'App\Http\Middleware\EnsureAdmin'])->group(function () {

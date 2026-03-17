@@ -3,11 +3,22 @@ import { PDFDocument } from 'pdf-lib'
 const API = {
   upload: '/api/upload',
   list: '/api/documents',
-  delete: (id) => `/api/documents/${id}`
+  delete: (id) => `/api/documents/${id}`,
+  invoices: '/api/credit-invoices',
+  ledger: '/api/credit-ledger',
+  summary: '/api/credit-summary',
 }
 
 function $(sel){ return document.querySelector(sel) }
 function el(tag, attrs={}){ const e=document.createElement(tag); Object.assign(e, attrs); return e }
+
+function csrfToken(){
+  return document.querySelector('input[name="_token"]')?.value || ''
+}
+
+function fmtDate(v) {
+  try { return v ? new Date(v).toLocaleString() : '' } catch { return '' }
+}
 
 let totalPages = null
 let pagesRequested = null
@@ -23,6 +34,23 @@ function getCreditBalance(){
 function setCreditBalance(nextBalance){
   const form = $('#uploadForm')
   if (form) form.dataset.creditBalance = String(nextBalance)
+
+  const node = document.getElementById('creditBalanceValue')
+  if (node) node.textContent = String(nextBalance ?? 0)
+}
+
+function setCreditCap(nextCap){
+  const node = document.getElementById('creditCapValue')
+  if (!node) return
+  const cap = parseInt(String(nextCap ?? '0'), 10)
+  node.textContent = (cap && cap > 0) ? String(cap) : 'No cap'
+}
+
+function setPricing({ unitPriceUsd, fxRateNgn }){
+  const u = document.getElementById('unitPriceUsd')
+  if (u && unitPriceUsd != null) u.textContent = String(unitPriceUsd)
+  const f = document.getElementById('fxRateNgn')
+  if (f && fxRateNgn != null) f.textContent = String(fxRateNgn)
 }
 
 function setGateMessage({ text, tone }){
@@ -31,12 +59,12 @@ function setGateMessage({ text, tone }){
   if (!text) {
     gate.textContent = ''
     gate.classList.add('hidden')
-    gate.classList.remove('text-red-600', 'text-green-700', 'text-gray-700')
+    gate.classList.remove('text-red-600', 'text-amber-700', 'text-gray-700')
     return
   }
   gate.textContent = text
   gate.classList.remove('hidden')
-  gate.classList.remove('text-red-600', 'text-green-700', 'text-gray-700')
+  gate.classList.remove('text-red-600', 'text-amber-700', 'text-gray-700')
   gate.classList.add(tone || 'text-gray-700')
 }
 
@@ -112,8 +140,176 @@ function updateUploadGate(){
   uploadBtn.disabled = false
   setGateMessage({
     text: `Need ${computed} credits, you have ${balance}.`,
-    tone: 'text-green-700',
+    tone: 'text-amber-700',
   })
+}
+
+// ---------------------------------------------------------------------------
+// Credits: summary, invoices, ledger
+// ---------------------------------------------------------------------------
+async function loadCreditSummary(){
+  try {
+    const r = await fetch(API.summary, {
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    const s = await r.json()
+    if (!r.ok) return
+    if (typeof s?.credit_balance === 'number') setCreditBalance(s.credit_balance)
+    setCreditCap(s?.credit_cap)
+    setPricing({ unitPriceUsd: s?.unit_price_usd, fxRateNgn: s?.fx_rate_ngn })
+  } catch {
+    // ignore
+  }
+}
+
+function moneyFmtUSD(v){
+  const n = Number(v || 0)
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00'
+}
+
+function moneyFmtNGN(v){
+  const n = Number(v || 0)
+  if (!Number.isFinite(n)) return '0'
+  try {
+    return Math.round(n).toLocaleString()
+  } catch {
+    return String(Math.round(n))
+  }
+}
+
+function computeTopUpEstimate(){
+  const form = document.getElementById('topUpForm')
+  if (!form) return
+
+  const credits = parseInt(String(document.getElementById('requested_credits')?.value || '0'), 10)
+  const unitPriceUsd = Number(form.dataset.unitPriceUsd || 0)
+  const fxRateNgn = Number(form.dataset.fxRateNgn || 0)
+
+  const amountUsd = (Number.isFinite(credits) && credits > 0) ? credits * unitPriceUsd : 0
+  const amountNgn = amountUsd * fxRateNgn
+
+  const usdNode = document.getElementById('topUpAmountUsd')
+  const ngnNode = document.getElementById('topUpAmountNgn')
+  if (usdNode) usdNode.textContent = `$${moneyFmtUSD(amountUsd)}`
+  if (ngnNode) ngnNode.textContent = `₦${moneyFmtNGN(amountNgn)}`
+}
+
+async function loadInvoices(){
+  const tbody = document.querySelector('#invoicesTable tbody')
+  if (!tbody) return
+  const msg = document.getElementById('invoicesMsg')
+
+  try {
+    const r = await fetch(API.invoices, {
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    const list = await r.json()
+    if (!r.ok) throw new Error(list?.message || list?.error || 'Failed to load invoices')
+
+    tbody.innerHTML = ''
+    if (msg) msg.textContent = Array.isArray(list) ? `${list.length} invoice(s)` : ''
+    for (const inv of (Array.isArray(list) ? list : [])) {
+      const tr = document.createElement('tr')
+      tr.append(
+        td(inv.invoice_number),
+        td(inv.requested_credits),
+        td(inv.requested_amount_usd),
+        td(inv.status),
+        td(fmtDate(inv.created_at)),
+        td(inv.admin_note || ''),
+      )
+      tbody.appendChild(tr)
+    }
+  } catch (e) {
+    if (msg) msg.textContent = e?.message || 'Failed to load invoices'
+  }
+}
+
+async function loadLedger(){
+  const tbody = document.querySelector('#userLedgerTable tbody')
+  if (!tbody) return
+  const msg = document.getElementById('ledgerMsg')
+
+  try {
+    const r = await fetch(API.ledger, {
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    const list = await r.json()
+    if (!r.ok) throw new Error(list?.message || list?.error || 'Failed to load ledger')
+
+    tbody.innerHTML = ''
+    if (msg) msg.textContent = Array.isArray(list) ? `${list.length} ledger row(s)` : ''
+    for (const l of (Array.isArray(list) ? list : [])) {
+      const tr = document.createElement('tr')
+      tr.append(
+        td(l.action_type),
+        td(l.credits),
+        td(l.balance_before),
+        td(l.balance_after),
+        td(l.document_id ?? ''),
+        td(l.invoice_id ?? ''),
+        td(fmtDate(l.created_at)),
+      )
+      tbody.appendChild(tr)
+    }
+  } catch (e) {
+    if (msg) msg.textContent = e?.message || 'Failed to load ledger'
+  }
+}
+
+async function submitTopUp(form){
+  const msg = document.getElementById('topUpMsg')
+  const btn = document.getElementById('topUpBtn')
+  const token = csrfToken()
+  if (!token) {
+    if (msg) { msg.textContent = 'Security token missing. Please refresh the page.'; msg.className = 'mt-2 text-sm text-red-600' }
+    return
+  }
+
+  const fd = new FormData(form)
+  try {
+    btn && (btn.disabled = true)
+    if (msg) { msg.textContent = 'Submitting…'; msg.className = 'mt-2 text-sm text-gray-600' }
+
+    const r = await fetch(API.invoices, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRF-TOKEN': token,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: fd,
+    })
+
+    const contentType = r.headers.get('content-type') || ''
+    const isJson = contentType.includes('application/json')
+    const data = isJson ? await r.json() : null
+    if (!r.ok) throw new Error(data?.message || data?.error || 'Top-up request failed')
+
+    if (msg) { msg.textContent = 'Top-up request submitted. Awaiting admin review.'; msg.className = 'mt-2 text-sm text-amber-700' }
+    form.reset()
+    computeTopUpEstimate()
+    await loadInvoices()
+    await loadLedger()
+    await loadCreditSummary()
+  } catch (e) {
+    if (msg) { msg.textContent = e?.message || 'Top-up request failed'; msg.className = 'mt-2 text-sm text-red-600' }
+  } finally {
+    btn && (btn.disabled = false)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +362,27 @@ function adjustDelay({ anyProcessing, fromPoll }){
 
 document.addEventListener('DOMContentLoaded', () => {
   const y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
-  loadDocs({ fromPoll: false })
+  const hasDocsTable = !!document.querySelector('#docsTable tbody')
+  const hasUploadForm = !!document.getElementById('uploadForm')
+
+  if (hasDocsTable) {
+    loadDocs({ fromPoll: false })
+  }
+
+  loadCreditSummary()
+  loadInvoices()
+  loadLedger()
+
+  const topUpForm = document.getElementById('topUpForm')
+  const requestedCredits = document.getElementById('requested_credits')
+  if (requestedCredits) requestedCredits.addEventListener('input', () => computeTopUpEstimate())
+  computeTopUpEstimate()
+  if (topUpForm) topUpForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    await submitTopUp(e.currentTarget)
+  })
+
+  if (!hasUploadForm) return
 
   const fileInput = $('#file')
   const pageStart = $('#page_start')
@@ -359,15 +575,24 @@ function renderDocs(list){
   if (!tbody) return
   tbody.innerHTML = ''
   list.forEach(d => {
+    const pages = `${d.page_start || ''}-${d.page_end || ''} (${d.pages_requested || 0}) / ${d.pages_processed ?? ''}`
+    const results = `${d.pages_with_results ?? ''}`
+    const credits = `res ${d.credits_reserved || 0} | cons ${d.credits_consumed || 0} | ref ${d.credits_refunded || 0}`
+
     const tr = el('tr')
     tr.append(
       td(d.id),
       td(d.filename),
       td(d.session||''),
       td(d.status),
+      td(pages),
+      td(results),
+      td(credits),
+      td(d.credit_status || ''),
       tdLink(d.csv_download, 'csv'),
       tdLink(d.xlsx_download, 'xlsx'),
       td(new Date(d.created_at).toLocaleString()),
+      td(d.failed_reason || ''),
       tdDelete(d.id)
     )
     tbody.appendChild(tr)
@@ -407,33 +632,13 @@ async function deleteDoc(id) {
   }
 }
 
-function renderResults(rows){
-  const tbody = document.querySelector('#resultsTable tbody')
-  if (!tbody) return
-  tbody.innerHTML = ''
-  rows.forEach(r => {
-    const tr = el('tr')
-    tr.append(
-      td(r.surname),
-      td(r.first_name),
-      td(r.other_name||''),
-      td(r.course_studied||''),
-      td(r.faculty||''),
-      td(r.grade||''),
-      td(r.qualification_obtained||''),
-      td(r.session||'')
-    )
-    tbody.appendChild(tr)
-  })
-}
-
 function td(v){ const d=document.createElement('td'); d.textContent=v??''; d.className='p-2 border-b'; return d }
 function tdLink(url, format){
   const d=document.createElement('td'); d.className='p-2 border-b'
   if(url){
     const a=document.createElement('a');
     a.href=url;
-    a.className='text-lime-700 underline';
+    a.className='text-amber-700 underline';
     a.textContent = 'Download';
     a.setAttribute('download', ''); // hint browser to download
     d.appendChild(a)

@@ -9,18 +9,21 @@ class AdminLedgerController extends Controller
     public function index()
     {
         return CreditLedger::query()
+            ->leftJoin('users', 'users.id', '=', 'credit_ledgers.user_id')
             ->select([
-                'id',
-                'user_id',
-                'document_id',
-                'invoice_id',
-                'action_type',
-                'credits',
-                'balance_before',
-                'balance_after',
-                'created_at',
+                'credit_ledgers.id',
+                'credit_ledgers.user_id',
+                'users.company_name as user_company_name',
+                'users.name as user_name',
+                'credit_ledgers.document_id',
+                'credit_ledgers.invoice_id',
+                'credit_ledgers.action_type',
+                'credit_ledgers.credits',
+                'credit_ledgers.balance_before',
+                'credit_ledgers.balance_after',
+                'credit_ledgers.created_at',
             ])
-            ->orderByDesc('id')
+            ->orderByDesc('credit_ledgers.id')
             ->limit(200)
             ->get();
     }

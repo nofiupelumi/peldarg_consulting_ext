@@ -26,6 +26,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Ensure generated URLs (route(), storage URL, signed routes) use the live domain & HTTPS in production
+        if ($this->app->environment(['local', 'testing'])) {
+            return;
+        }
+
         $appUrl = config('app.url');
         if (!empty($appUrl)) {
             URL::forceRootUrl($appUrl);

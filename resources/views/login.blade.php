@@ -9,16 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css'])
 </head>
-<body class="bg-gradient-to-br from-lime-50 via-green-50 to-lime-100 min-h-screen flex items-center justify-center font-sans">
+<body class="bg-slate-950 min-h-screen flex items-center justify-center font-sans">
     <div class="w-full max-w-md px-4">
-        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
             <!-- Header -->
-            <div class="bg-gradient-to-r from-lime-500 to-lime-400 text-[#0a2912] px-8 py-6">
+            <div class="bg-slate-950 text-white px-8 py-6 border-b border-white/10">
                 <div class="flex items-center justify-center gap-3 mb-2">
-                    <div class="w-12 h-12 rounded-full bg-[#0a2912] text-white flex items-center justify-center font-bold text-xl">PC</div>
+                    <img src="{{ asset('images/peldarg-logo.png') }}" alt="Peldarg Consulting" class="h-12 w-auto" />
                 </div>
                 <h1 class="text-2xl font-bold text-center">Peldarg Consulting Limited</h1>
-                <p class="text-center text-sm opacity-90 mt-1">Convocation Extractor Console</p>
+                <p class="text-center text-sm text-white/80 mt-1">Extraction Platform</p>
             </div>
 
             <!-- Login Form -->
@@ -36,7 +36,7 @@
                 @endif
 
                 @if (session('success'))
-                    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                    <div class="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg mb-4 text-sm">
                         {{ session('success') }}
                     </div>
                 @endif
@@ -52,7 +52,7 @@
                             value="{{ old('email') }}"
                             required 
                             autofocus
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 outline-none transition"
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none transition"
                             placeholder="admin@peldargconsulting.com"
                         />
                     </div>
@@ -64,14 +64,14 @@
                             id="password" 
                             name="password" 
                             required
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-lime-500 focus:border-lime-500 outline-none transition"
+                            class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none transition"
                             placeholder="••••••••"
                         />
                     </div>
 
                     <button 
                         type="submit"
-                        class="w-full bg-lime-500 hover:bg-lime-600 text-[#0a2912] font-semibold px-4 py-3 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                        class="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-semibold px-4 py-3 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
                     >
                         Sign In
                     </button>
@@ -86,7 +86,7 @@
         </div>
 
         <div class="text-center mt-6">
-            <p class="text-sm text-gray-600">© {{ date('Y') }} Peldarg Consulting Limited</p>
+            <p class="text-sm text-white/70">© {{ date('Y') }} Peldarg Consulting Limited</p>
         </div>
     </div>
 </body>

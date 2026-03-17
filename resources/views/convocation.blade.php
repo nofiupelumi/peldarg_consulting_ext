@@ -9,50 +9,99 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css','resources/js/convocation.js'])
 </head>
-<body class="bg-green-50 text-gray-900 font-sans">
-    <header class="bg-gradient-to-r from-lime-500 to-lime-300 text-[#0a2912] border-b-4 border-lime-600">
+<body class="bg-slate-50 text-slate-900 font-sans">
+    <header class="bg-slate-950 text-white border-b border-white/10">
         <div class="max-w-5xl mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-[#0a2912] text-white flex items-center justify-center font-bold">PC</div>
+                    <img src="{{ asset('images/peldarg-logo.png') }}" alt="Peldarg Consulting" class="h-10 w-auto" />
                     <div>
                         <h1 class="m-0 text-lg font-semibold">Peldarg Consulting Limited</h1>
-                        <p class="m-0 text-xs opacity-90">Convocation PDF Extraction Console</p>
+                        <p class="m-0 text-xs text-white/80">Welcome, {{ $userName ?? 'User' }}</p>
                     </div>
                 </div>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit" class="text-sm px-4 py-2 bg-[#0a2912] text-white rounded-lg hover:bg-opacity-90 transition">
-                        Logout
-                    </button>
-                </form>
+
+                <div class="flex items-center gap-2 flex-wrap justify-end">
+                    <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10">Dashboard</a>
+                    <a href="{{ route('topup') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Top up</a>
+                    <a href="{{ route('payment.history') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Payment history</a>
+                    <a href="{{ route('settings') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Settings</a>
+
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="text-sm px-4 py-2 bg-amber-400 text-slate-950 rounded-lg hover:bg-amber-300 transition">
+                            Logout
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </header>
 
     <main class="max-w-5xl mx-auto px-4 py-6">
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="rounded-xl p-5 border border-white/10 bg-slate-950 text-white shadow-sm">
+                <h2 class="text-sm font-semibold text-white/80">Credit Balance</h2>
+                <div class="mt-2 flex items-end gap-2">
+                    <div id="creditBalanceValue" class="text-4xl font-bold leading-none">{{ (int) ($creditBalance ?? 0) }}</div>
+                    <div class="pb-1 text-sm text-white/70">credits</div>
+                </div>
+                <div class="mt-2 text-sm text-white/70">
+                    Cap: <span id="creditCapValue">{{ (int) ($creditCap ?? 0) > 0 ? (int) $creditCap : 'No cap' }}</span>
+                </div>
+                <div class="mt-3 text-xs text-white/60">
+                    Unit price: $<span id="unitPriceUsd">{{ $unitPriceUsd ?? '' }}</span> / credit
+                </div>
+                <div class="mt-4">
+                    <a href="{{ route('topup') }}" class="inline-flex items-center justify-center text-sm px-4 py-2 bg-amber-400 text-slate-950 rounded-lg hover:bg-amber-300 transition">
+                        Top up
+                    </a>
+                </div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <h2 class="text-sm font-semibold text-gray-700">Booklets uploaded</h2>
+                <div class="mt-2">
+                    <div class="text-3xl font-bold leading-none">{{ (int) ($uploadsToday ?? 0) }}</div>
+                    <div class="text-sm text-gray-600 mt-1">Today</div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <div class="text-2xl font-bold leading-none">{{ (int) ($uploadsThisMonth ?? 0) }}</div>
+                    <div class="text-sm text-gray-600 mt-1">This month</div>
+                </div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <h2 class="text-sm font-semibold text-gray-700">PDFs successfully extracted</h2>
+                <div class="mt-2">
+                    <div class="text-3xl font-bold leading-none">{{ (int) ($successfulExtractsTotal ?? 0) }}</div>
+                    <div class="text-sm text-gray-600 mt-1">Total</div>
+                </div>
+            </div>
+        </section>
+
         <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
             <h2 class="text-xl font-semibold mb-4">Upload Convocation PDF</h2>
             <form id="uploadForm" class="space-y-3" method="POST" action="javascript:void(0);" onsubmit="return false;" data-credit-balance="{{ (int) ($creditBalance ?? 0) }}">
                 @csrf
                 <div class="flex flex-col gap-2">
                     <label for="file" class="font-medium">PDF File</label>
-                    <input id="file" name="file" type="file" accept="application/pdf" required class="rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-lime-500" />
+                    <input id="file" name="file" type="file" accept="application/pdf" required class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
                     <small class="text-gray-500 text-xs">Max upload size: {{ (int) ($maxUploadMb ?? 0) }}MB (PDF only)</small>
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="session" class="font-medium">Session (optional)</label>
-                    <input id="session" name="session" type="text" placeholder="e.g. 2021/2022" class="rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-lime-500" />
+                    <input id="session" name="session" type="text" placeholder="e.g. 2021/2022" class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
                     <small class="text-gray-500 text-xs">If not provided, will be auto-detected from PDF</small>
                 </div>
                 <div class="flex gap-3">
                     <div class="flex-1 flex flex-col gap-2">
                         <label for="page_start" class="font-medium">Start Page (optional)</label>
-                        <input id="page_start" name="page_start" type="number" min="1" placeholder="e.g. 1" class="rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-lime-500" />
+                        <input id="page_start" name="page_start" type="number" min="1" placeholder="e.g. 1" class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
                     </div>
                     <div class="flex-1 flex flex-col gap-2">
                         <label for="page_end" class="font-medium">End Page (optional)</label>
-                        <input id="page_end" name="page_end" type="number" min="1" placeholder="e.g. 10" class="rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-lime-500" />
+                        <input id="page_end" name="page_end" type="number" min="1" placeholder="e.g. 10" class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
                     </div>
                 </div>
                 <div id="pageValidationError" class="text-red-600 text-sm hidden">End page must be greater than or equal to start page</div>
@@ -61,12 +110,12 @@
                 <!-- Progress bar -->
                 <div id="uploadProgress" class="hidden">
                     <div class="w-full bg-gray-200 rounded-full h-2.5">
-                        <div id="progressBar" class="bg-lime-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        <div id="progressBar" class="bg-amber-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
                     <p id="progressText" class="text-sm text-gray-600 mt-2 text-center">Uploading...</p>
                 </div>
                 
-                <button id="uploadBtn" type="submit" disabled class="w-full py-3 bg-lime-500 text-[#0a2912] font-semibold rounded-lg hover:bg-lime-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <button id="uploadBtn" type="submit" disabled class="w-full py-3 bg-amber-400 text-slate-950 font-semibold rounded-lg hover:bg-amber-300 transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Upload and Extract
                 </button>
             </form>
@@ -74,7 +123,7 @@
         </section>
 
         <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
-            <h2 class="text-xl font-semibold mb-3">Documents</h2>
+            <h2 class="text-xl font-semibold mb-3">Audit &amp; History (PDF uploads)</h2>
             <div class="overflow-auto">
                 <table class="w-full text-sm border-collapse" id="docsTable">
                     <thead>
@@ -83,9 +132,14 @@
                             <th class="text-left p-2 border-b">Filename</th>
                             <th class="text-left p-2 border-b">Session</th>
                             <th class="text-left p-2 border-b">Status</th>
+                            <th class="text-left p-2 border-b">Pages</th>
+                            <th class="text-left p-2 border-b">Results</th>
+                            <th class="text-left p-2 border-b">Credits</th>
+                            <th class="text-left p-2 border-b">Credit status</th>
                             <th class="text-left p-2 border-b">CSV</th>
                             <th class="text-left p-2 border-b">XLSX</th>
                             <th class="text-left p-2 border-b">Created</th>
+                            <th class="text-left p-2 border-b">Failure reason</th>
                             <th class="text-left p-2 border-b">Actions</th>
                         </tr>
                     </thead>
@@ -93,31 +147,9 @@
                 </table>
             </div>
         </section>
-
-        <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
-            <h2 class="text-xl font-semibold mb-3">Extracted Students</h2>
-            <div class="overflow-auto">
-                <table class="w-full text-sm border-collapse" id="resultsTable">
-                    <thead>
-                        <tr class="bg-gray-50 text-gray-900">
-                            <th class="text-left p-2 border-b">Surname</th>
-                            <th class="text-left p-2 border-b">First Name</th>
-                            <th class="text-left p-2 border-b">Other Name</th>
-                            <th class="text-left p-2 border-b">Course</th>
-                            <th class="text-left p-2 border-b">Faculty</th>
-                            <th class="text-left p-2 border-b">Grade</th>
-                            <th class="text-left p-2 border-b">Qualification</th>
-                            <th class="text-left p-2 border-b">Session</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <div id="searchMsg" class="text-sm text-gray-600 mt-2"></div>
-        </section>
     </main>
 
-    <footer class="text-center text-green-900 py-6">
+    <footer class="text-center text-slate-700 py-6">
         <div class="max-w-5xl mx-auto px-4">
             <small>© <span id="year"></span> Peldarg Consulting Limited</small>
         </div>

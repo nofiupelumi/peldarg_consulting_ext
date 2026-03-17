@@ -15,6 +15,10 @@ class AuthController extends Controller
     public function showLogin()
     {
         if (Session::has('authenticated') && Session::get('authenticated') === true) {
+            if ((bool) Session::get('is_admin') === true) {
+                return redirect()->route('admin.console');
+            }
+
             return redirect()->route('dashboard');
         }
         return view('login');
@@ -46,8 +50,14 @@ class AuthController extends Controller
             Session::put('user_email', $user->email);
             Session::put('user_name', $user->company_name ?: $user->name);
             Session::put('is_admin', (bool) $user->is_admin);
-            
-            return redirect()->route('dashboard')->with('success', 'Welcome back, ' . ($user->company_name ?: $user->name) . '!');
+
+            $name = $user->company_name ?: $user->name;
+
+            if ((bool) $user->is_admin === true) {
+                return redirect()->route('admin.console')->with('success', 'Welcome back, ' . $name . '!');
+            }
+
+            return redirect()->route('dashboard')->with('success', 'Welcome back, ' . $name . '!');
         }
 
         return back()->withErrors(['email' => 'Invalid credentials'])->withInput();
