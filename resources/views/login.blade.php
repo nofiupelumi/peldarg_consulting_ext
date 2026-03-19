@@ -14,11 +14,7 @@
         <div class="bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
             <!-- Header -->
             <div class="bg-slate-950 text-white px-8 py-6 border-b border-white/10">
-                <div class="flex items-center justify-center gap-3 mb-2">
-                    <img src="{{ asset('images/peldarg-logo.png') }}" alt="Peldarg Consulting" class="h-12 w-auto" />
-                </div>
-                <h1 class="text-2xl font-bold text-center">Peldarg Consulting Limited</h1>
-                <p class="text-center text-sm text-white/80 mt-1">Extraction Platform</p>
+                <h1 class="text-2xl font-bold text-center">Institutions Convocation Booklet Extraction Platform</h1>
             </div>
 
             <!-- Login Form -->
@@ -53,7 +49,7 @@
                             required 
                             autofocus
                             class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none transition"
-                            placeholder="admin@peldargconsulting.com"
+                            placeholder=""
                         />
                     </div>
 
@@ -78,9 +74,6 @@
                 </form>
 
                 <div class="mt-6 text-center">
-                    <p class="text-xs text-gray-500">
-                        Default credentials: admin@peldargconsulting.com / Admin@12345
-                    </p>
                 </div>
             </div>
         </div>

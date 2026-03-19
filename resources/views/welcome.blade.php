@@ -24,7 +24,6 @@
             <div class="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
                 <a href="{{ url('/') }}" class="flex items-center gap-3">
                     <img src="{{ asset('images/peldarg-logo.png') }}" alt="Peldarg Consulting" class="h-10 w-auto" />
-                    <span class="text-lg font-semibold tracking-wide">Peldarg Extraction</span>
                 </a>
 
                 @if (Route::has('login'))
@@ -49,10 +48,10 @@
 
         <main class="mx-auto max-w-6xl px-6 py-16">
             <h1 class="text-4xl md:text-5xl font-bold tracking-tight">
-                Secure extraction workflows, built for teams.
+                Secure extraction workflows.
             </h1>
             <p class="mt-4 max-w-2xl text-white/80">
-                The Peldarg Extraction Platform provides credit-controlled access to document extraction, with a secured CI integration for automated pipelines.
+                The Extraction Platform provides credit-controlled access to document extraction, with a secured CI integration for automated pipelines.
             </p>
 
             <div class="mt-10 grid gap-6 md:grid-cols-3">
@@ -63,10 +62,6 @@
                 <div class="rounded-lg bg-white/5 border border-white/10 p-6">
                     <h2 class="text-lg font-semibold">Secured pipeline callbacks</h2>
                     <p class="mt-2 text-sm text-white/75">Token authentication plus HMAC signatures for CI callbacks.</p>
-                </div>
-                <div class="rounded-lg bg-white/5 border border-white/10 p-6">
-                    <h2 class="text-lg font-semibold">Admin console</h2>
-                    <p class="mt-2 text-sm text-white/75">Manage settings, users, invoices, and audit trails from one place.</p>
                 </div>
             </div>
 

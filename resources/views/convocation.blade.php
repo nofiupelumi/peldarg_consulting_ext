@@ -14,15 +14,14 @@
         <div class="max-w-5xl mx-auto px-4 py-4">
             <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <img src="{{ asset('images/peldarg-logo.png') }}" alt="Peldarg Consulting" class="h-10 w-auto" />
-                    <div>
-                        <h1 class="m-0 text-lg font-semibold">Peldarg Consulting Limited</h1>
-                        <p class="m-0 text-xs text-white/80">Welcome, {{ $userName ?? 'User' }}</p>
-                    </div>
+                    <p class="m-0 text-sm text-white/90">Welcome, {{ $userName ?? 'User' }}</p>
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap justify-end">
                     <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10">Dashboard</a>
+                    @if ((bool) session('is_admin'))
+                        <a href="{{ route('admin.console') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Admin</a>
+                    @endif
                     <a href="{{ route('topup') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Top up</a>
                     <a href="{{ route('payment.history') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Payment history</a>
                     <a href="{{ route('settings') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Settings</a>
@@ -95,7 +94,7 @@
                     <small class="text-gray-500 text-xs">If not provided, will be auto-detected from PDF</small>
                 </div>
                 <div class="flex flex-col gap-2">
-                    <label for="api_tier" class="font-medium">Gemini API Key Tier</label>
+                    <label for="api_tier" class="font-medium">API Key Tier</label>
                     <select id="api_tier" name="api_tier" class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" required>
                         @foreach(($availableApiTiers ?? ['paid_1']) as $tier)
                             <option value="{{ $tier }}" {{ ($defaultApiTier ?? 'paid_1') === $tier ? 'selected' : '' }}>
