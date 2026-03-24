@@ -104,6 +104,14 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
         ]);
     })->name('how.to.use');
 
+    Route::get('/booklet-log', function () {
+        $user = User::findOrFail((int) session('user_id'));
+
+        return view('booklet-log', [
+            'userName' => (string) ($user->company_name ?: $user->name ?: 'User'),
+        ]);
+    })->name('booklet.log');
+
     Route::middleware(['App\Http\Middleware\EnsureAdmin'])->group(function () {
         Route::get('/admin', function () {
             $settings = AppSetting::current();

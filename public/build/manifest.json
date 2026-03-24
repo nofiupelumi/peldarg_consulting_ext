@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DJPp8wQm.css",
+    "file": "assets/app-C0qGceWE.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "names": [
@@ -17,6 +17,12 @@
     "file": "assets/app-Bj43h_rG.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/booklet-log.js": {
+    "file": "assets/booklet-log-IqWwiSJw.js",
+    "name": "booklet-log",
+    "src": "resources/js/booklet-log.js",
     "isEntry": true
   },
   "resources/js/convocation.js": {

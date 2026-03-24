@@ -9,6 +9,7 @@ use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\CreditInvoiceController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\GithubController;
+use App\Http\Controllers\BookletLogController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserCreditController;
 use App\Http\Controllers\UserAccountController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\UserAccountController;
 Route::middleware(['web', 'App\Http\Middleware\CheckAuth'])->group(function () {
     Route::post('/upload', [DocumentController::class, 'upload']);
     Route::get('/documents', [DocumentController::class, 'index']);
+    Route::get('/booklet-logs', [BookletLogController::class, 'index']);
     Route::delete('/documents/{doc}', [DocumentController::class, 'delete']);
 
     Route::get('/credit-summary', [UserCreditController::class, 'summary']);

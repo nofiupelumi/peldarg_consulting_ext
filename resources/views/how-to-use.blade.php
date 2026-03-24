@@ -12,8 +12,8 @@
 <body class="bg-slate-50 text-slate-900" style="font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;">
     <header class="bg-slate-950 text-white border-b border-white/10">
         <div class="max-w-6xl mx-auto px-4 py-4">
-            <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="flex items-center gap-3 min-w-0">
                     <img src="{{ asset('images/peldarg-logo.png') }}" alt="Peldarg Consulting" class="h-10 w-auto" />
                     <div>
                         <h1 class="m-0 text-lg font-semibold">Peldarg Consulting Limited</h1>
@@ -21,8 +21,9 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 flex-wrap justify-end">
+                <div class="w-full md:w-auto flex items-center gap-2 flex-wrap md:justify-end">
                     <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Dashboard</a>
+                    <a href="{{ route('booklet.log') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Booklet Log</a>
                     <a href="{{ route('how.to.use') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10">How To Use</a>
                     <a href="{{ route('topup') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Top up</a>
                     <a href="{{ route('payment.history') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Payment history</a>
