@@ -25,15 +25,20 @@ class AdminSettingsController extends Controller
 
     public function show()
     {
-        return AppSetting::current();
+        $settings = AppSetting::current()->toArray();
+        $settings['max_upload_mb'] = AppSetting::current()->effectiveMaxUploadMb();
+
+        return response()->json($settings);
     }
 
     public function update(Request $request)
     {
+        $phpUploadLimitMb = AppSetting::phpUploadLimitMb();
+
         $data = $request->validate([
             'unit_price_usd' => 'required|numeric|min:0',
             'fx_rate_ngn' => 'required|numeric|min:0',
-            'max_upload_mb' => 'required|integer|min:1',
+            'max_upload_mb' => 'required|integer|min:1|max:' . $phpUploadLimitMb,
             'admin_2fa_required' => 'required|boolean',
         ]);
 

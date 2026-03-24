@@ -20,6 +20,7 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
     Route::get('/dashboard', function () {
         $user = User::findOrFail((int) session('user_id'));
         $settings = AppSetting::current();
+        $maxUploadMb = $settings->effectiveMaxUploadMb();
         $allApiTiers = ['paid_1', 'paid_2', 'paid_3'];
         $allowedApiTiers = (bool) $user->is_admin
             ? $allApiTiers
@@ -48,7 +49,7 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
             'creditCap' => (int) ($user->credit_cap ?? 0),
             'unitPriceUsd' => (string) $settings->unit_price_usd,
             'fxRateNgn' => (string) $settings->fx_rate_ngn,
-            'maxUploadMb' => (int) $settings->max_upload_mb,
+            'maxUploadMb' => $maxUploadMb,
             'uploadsToday' => (int) $uploadsToday,
             'uploadsThisMonth' => (int) $uploadsThisMonth,
             'successfulExtractsTotal' => (int) $successfulExtractsTotal,
@@ -98,11 +99,12 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
     Route::middleware(['App\Http\Middleware\EnsureAdmin'])->group(function () {
         Route::get('/admin', function () {
             $settings = AppSetting::current();
+            $maxUploadMb = $settings->effectiveMaxUploadMb();
 
             return view('admin', [
                 'unitPriceUsd' => (string) $settings->unit_price_usd,
                 'fxRateNgn' => (string) $settings->fx_rate_ngn,
-                'maxUploadMb' => (int) $settings->max_upload_mb,
+                'maxUploadMb' => $maxUploadMb,
                 'admin2faRequired' => (bool) $settings->admin_2fa_required,
             ]);
         })->name('admin.console');

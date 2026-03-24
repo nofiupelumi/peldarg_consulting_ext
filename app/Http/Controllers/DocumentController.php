@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\AppSetting;
 use App\Services\CreditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -25,7 +26,7 @@ class DocumentController extends Controller
     public function upload(Request $req)
     {
         $settings = AppSetting::current();
-        $maxUploadKb = max(1, (int) $settings->max_upload_mb) * 1024;
+        $maxUploadKb = $settings->effectiveMaxUploadMb() * 1024;
 
         $req->validate([
             'file' => 'required|mimes:pdf|max:' . $maxUploadKb,
@@ -131,11 +132,46 @@ class DocumentController extends Controller
                 'page_start' => $effectiveStart,
                 'page_end' => $effectiveEnd,
             ];
-            Http::withToken($pat)
-                ->post('https://api.github.com/repos/' . config('services.github.dispatch_repo') . '/dispatches', [
-                    'event_type' => 'process_pdf',
-                    'client_payload' => $payload
+
+            try {
+                $response = Http::withToken($pat)
+                    ->acceptJson()
+                    ->connectTimeout(5)
+                    ->timeout(15)
+                    ->post('https://api.github.com/repos/' . config('services.github.dispatch_repo') . '/dispatches', [
+                        'event_type' => 'process_pdf',
+                        'client_payload' => $payload,
+                    ]);
+
+                if (!$response->successful()) {
+                    throw ValidationException::withMessages([
+                        'file' => 'Processing dispatch failed. Please try again shortly.',
+                    ]);
+                }
+            } catch (\Throwable $exception) {
+                Log::error('document upload dispatch failed', [
+                    'document_id' => $doc->id,
+                    'request_id' => $doc->request_id,
+                    'user_id' => $user->id,
+                    'message' => $exception->getMessage(),
                 ]);
+
+                $this->creditService->finalizeDocument(
+                    document: $doc,
+                    pagesProcessed: 0,
+                    pagesWithResults: 0,
+                    status: 'failed',
+                    failedReason: 'Unable to queue processing job.',
+                );
+
+                if ($doc->path) {
+                    Storage::disk('public')->delete($doc->path);
+                }
+
+                throw ValidationException::withMessages([
+                    'file' => 'Unable to queue processing right now. Please try again shortly.',
+                ]);
+            }
         }
 
         return response()->json([
