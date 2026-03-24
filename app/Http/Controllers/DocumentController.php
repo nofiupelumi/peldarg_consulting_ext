@@ -123,7 +123,8 @@ class DocumentController extends Controller
         // Extend expiry to 24h to accommodate long/parallel processing in CI
         $sourceUrl = URL::temporarySignedRoute('documents.download', now()->addHours(24), ['doc' => $doc->id]);
 
-        $pat = config('services.github.pat');
+        $pat = (string) config('services.github.pat');
+        $dispatchRepo = trim((string) config('services.github.dispatch_repo'));
         if (!empty($pat)) {
             $payload = [
                 'source_url' => $sourceUrl,
@@ -139,26 +140,39 @@ class DocumentController extends Controller
                 'page_end' => $effectiveEnd,
             ];
 
+            $dispatchStatus = null;
+            $dispatchBody = null;
+
             try {
+                if ($dispatchRepo === '') {
+                    throw new \RuntimeException('GitHub dispatch repo is not configured.');
+                }
+
                 $response = Http::withToken($pat)
                     ->acceptJson()
                     ->connectTimeout(5)
                     ->timeout(15)
-                    ->post('https://api.github.com/repos/' . config('services.github.dispatch_repo') . '/dispatches', [
+                    ->post('https://api.github.com/repos/' . $dispatchRepo . '/dispatches', [
                         'event_type' => 'process_pdf',
                         'client_payload' => $payload,
                     ]);
 
+                $dispatchStatus = $response->status();
+                $dispatchBody = mb_substr((string) $response->body(), 0, 1000);
+
                 if (!$response->successful()) {
-                    throw ValidationException::withMessages([
-                        'file' => 'Processing dispatch failed. Please try again shortly.',
-                    ]);
+                    throw new \RuntimeException('GitHub dispatch API returned HTTP ' . $response->status());
                 }
             } catch (\Throwable $exception) {
                 Log::error('document upload dispatch failed', [
                     'document_id' => $doc->id,
                     'request_id' => $doc->request_id,
                     'user_id' => $user->id,
+                    'dispatch_repo' => $dispatchRepo,
+                    'dispatch_status' => $dispatchStatus,
+                    'dispatch_response' => $dispatchBody,
+                    'pat_configured' => $pat !== '',
+                    'exception_class' => get_class($exception),
                     'message' => $exception->getMessage(),
                 ]);
 
