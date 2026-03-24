@@ -23,6 +23,7 @@
 
                 <div class="flex items-center gap-2 flex-wrap justify-end">
                     <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Dashboard</a>
+                    <a href="{{ route('how.to.use') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">How To Use</a>
                     <a href="{{ route('topup') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Top up</a>
                     <a href="{{ route('payment.history') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10">Payment history</a>
                     <a href="{{ route('settings') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Settings</a>

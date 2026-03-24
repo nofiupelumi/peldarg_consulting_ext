@@ -19,6 +19,7 @@
 
                 <div class="flex items-center gap-2 flex-wrap justify-end">
                     <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10">Dashboard</a>
+                    <a href="{{ route('how.to.use') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">How To Use</a>
                     @if ((bool) session('is_admin'))
                         <a href="{{ route('admin.console') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Admin</a>
                     @endif
@@ -80,7 +81,12 @@
         </section>
 
         <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
-            <h2 class="text-xl font-semibold mb-4">Upload Convocation PDF</h2>
+            <div class="mb-4 flex items-center justify-between gap-3 flex-wrap">
+                <h2 class="text-xl font-semibold">Upload Convocation PDF</h2>
+                <a href="{{ route('how.to.use') }}" class="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                    How To Use
+                </a>
+            </div>
             <form id="uploadForm" class="space-y-3" method="POST" action="javascript:void(0);" onsubmit="return false;" data-credit-balance="{{ (int) ($creditBalance ?? 0) }}">
                 @csrf
                 <div class="flex flex-col gap-2">

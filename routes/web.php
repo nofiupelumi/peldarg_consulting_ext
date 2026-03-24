@@ -96,6 +96,14 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
         ]);
     })->name('settings');
 
+    Route::get('/how-to-use', function () {
+        $user = User::findOrFail((int) session('user_id'));
+
+        return view('how-to-use', [
+            'userName' => (string) ($user->company_name ?: $user->name ?: 'User'),
+        ]);
+    })->name('how.to.use');
+
     Route::middleware(['App\Http\Middleware\EnsureAdmin'])->group(function () {
         Route::get('/admin', function () {
             $settings = AppSetting::current();
