@@ -61,21 +61,19 @@ class DocumentController extends Controller
 
         $file = $req->file('file');
 
-        // Auto-count pages from the PDF.
-        try {
-            $pdf = new \setasign\Fpdi\Fpdi();
-            $totalPages = (int) $pdf->setSourceFile($file->getRealPath());
-        } catch (\Throwable $e) {
-            throw ValidationException::withMessages([
-                'file' => 'Unable to read PDF page count. Please re-export the PDF and try again.',
-            ]);
-        }
+        // Auto-count pages from the PDF with fallbacks for host-specific parser limitations.
+        $pageCountError = null;
+        $totalPages = $this->detectPdfPageCount($file->getRealPath(), $pageCountError);
         if ($totalPages < 1) {
+            Log::warning('pdf page count detection failed', [
+                'filename' => $file->getClientOriginalName(),
+                'reason' => $pageCountError,
+            ]);
+
             throw ValidationException::withMessages([
-                'file' => 'PDF appears to have no pages.',
+                'file' => 'Unable to read PDF page count. The PDF may be encrypted/corrupted or uses an unsupported format. Please export as a standard PDF and try again.',
             ]);
         }
-
         $startPage = $req->filled('start_page') ? (int) $req->input('start_page') : null;
         $endPage = $req->filled('end_page') ? (int) $req->input('end_page') : null;
         $effectiveStart = $startPage ?: 1;
@@ -190,6 +188,66 @@ class DocumentController extends Controller
             'api_tier' => (string) $doc->api_tier,
             'request_id' => (string) $doc->request_id,
         ]);
+    }
+
+    private function detectPdfPageCount(?string $path, ?string &$error = null): int
+    {
+        $error = null;
+
+        if (!$path || !is_readable($path)) {
+            $error = 'upload temp file is not readable';
+            return 0;
+        }
+
+        // Primary strategy: FPDI parser.
+        try {
+            $pdf = new \setasign\Fpdi\Fpdi();
+            $count = (int) $pdf->setSourceFile($path);
+            if ($count > 0) {
+                return $count;
+            }
+        } catch (\Throwable $e) {
+            $error = 'fpdi: ' . $e->getMessage();
+        }
+
+        // Secondary strategy: system pdfinfo (if available in host environment).
+        if (is_callable('exec')) {
+            try {
+                $cmd = 'pdfinfo ' . escapeshellarg($path) . ' 2>/dev/null';
+                $output = [];
+                $exitCode = 1;
+                @exec($cmd, $output, $exitCode);
+
+                if ($exitCode === 0) {
+                    foreach ($output as $line) {
+                        if (preg_match('/^Pages:\s*(\d+)/i', trim((string) $line), $matches) === 1) {
+                            $count = (int) ($matches[1] ?? 0);
+                            if ($count > 0) {
+                                return $count;
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $error = $error ?: ('pdfinfo: ' . $e->getMessage());
+            }
+        }
+
+        // Final fallback: approximate page count from PDF page markers.
+        try {
+            $bytes = @file_get_contents($path);
+            if ($bytes !== false) {
+                preg_match_all('/\/Type\s*\/Page\b/i', $bytes, $matches);
+                $count = count($matches[0] ?? []);
+                if ($count > 0) {
+                    return $count;
+                }
+            }
+        } catch (\Throwable $e) {
+            $error = $error ?: ('regex fallback: ' . $e->getMessage());
+        }
+
+        return 0;
     }
 
     public function download(Request $req, Document $doc)
