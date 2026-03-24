@@ -11,26 +11,26 @@
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
     <header class="bg-slate-950 text-white border-b border-white/10">
-        <div class="max-w-5xl mx-auto px-4 py-4">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3 min-w-0">
                     <p class="m-0 text-sm text-white/90">Welcome, {{ $userName ?? 'User' }}</p>
                 </div>
 
-                <div class="w-full md:w-auto flex items-center gap-2 flex-wrap md:justify-end">
-                    <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10">Dashboard</a>
-                    <a href="{{ route('booklet.log') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Booklet Log</a>
-                    <a href="{{ route('how.to.use') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">How To Use</a>
+                <div class="flex items-center gap-2 flex-nowrap">
+                    <a href="{{ route('dashboard') }}" class="text-sm px-3 py-2 rounded-lg bg-white/10 whitespace-nowrap shrink-0">Dashboard</a>
+                    <a href="{{ route('booklet.log') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10 whitespace-nowrap shrink-0">Booklet Log</a>
+                    <a href="{{ route('how.to.use') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10 whitespace-nowrap shrink-0">How To Use</a>
                     @if ((bool) session('is_admin'))
-                        <a href="{{ route('admin.console') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Admin</a>
+                        <a href="{{ route('admin.console') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10 whitespace-nowrap shrink-0">Admin</a>
                     @endif
-                    <a href="{{ route('topup') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Top up</a>
-                    <a href="{{ route('payment.history') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Payment history</a>
-                    <a href="{{ route('settings') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10">Settings</a>
+                    <a href="{{ route('topup') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10 whitespace-nowrap shrink-0">Top up</a>
+                    <a href="{{ route('payment.history') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10 whitespace-nowrap shrink-0">Payment history</a>
+                    <a href="{{ route('settings') }}" class="text-sm px-3 py-2 rounded-lg hover:bg-white/10 whitespace-nowrap shrink-0">Settings</a>
 
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
-                        <button type="submit" class="text-sm px-4 py-2 bg-amber-400 text-slate-950 rounded-lg hover:bg-amber-300 transition">
+                        <button type="submit" class="text-sm px-4 py-2 bg-amber-400 text-slate-950 rounded-lg hover:bg-amber-300 transition whitespace-nowrap shrink-0">
                             Logout
                         </button>
                     </form>
@@ -39,7 +39,7 @@
         </div>
     </header>
 
-    <main class="max-w-5xl mx-auto px-4 py-6">
+    <main class="max-w-7xl mx-auto px-6 py-6">
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="rounded-xl p-5 border border-white/10 bg-slate-950 text-white shadow-sm">
                 <h2 class="text-sm font-semibold text-white/80">Credit Balance</h2>
@@ -93,7 +93,7 @@
                 <div class="flex flex-col gap-2">
                     <label for="file" class="font-medium">PDF File</label>
                     <input id="file" name="file" type="file" accept="application/pdf" required class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
-                    <small class="text-gray-500 text-xs">Max upload size: {{ (int) ($maxUploadMb ?? 0) }}MB (PDF only)</small>
+                    <small class="text-gray-500 text-xs">Max upload size: 100MB (PDF only)</small>
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="session" class="font-medium">Session (optional)</label>
@@ -168,7 +168,7 @@
     </main>
 
     <footer class="text-center text-slate-700 py-6">
-        <div class="max-w-5xl mx-auto px-4">
+        <div class="max-w-7xl mx-auto px-6">
             <small>© <span id="year"></span> Peldarg Consulting Limited</small>
         </div>
     </footer>
