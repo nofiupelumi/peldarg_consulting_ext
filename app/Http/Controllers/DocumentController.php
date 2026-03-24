@@ -135,7 +135,6 @@ class DocumentController extends Controller
                 'doc_id' => (string)$doc->id,
                 'request_id' => (string)$doc->request_id,
                 'api_tier' => $selectedApiTier,
-                'pages_requested' => $pagesRequested,
                 'page_start' => $effectiveStart,
                 'page_end' => $effectiveEnd,
             ];
