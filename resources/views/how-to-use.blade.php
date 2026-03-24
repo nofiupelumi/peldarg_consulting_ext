@@ -164,6 +164,102 @@
                 </div>
             </aside>
         </section>
+
+        <section class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+                <h3 class="text-xl font-bold text-slate-900">Audit Log Terms and Meanings</h3>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    Audit and History Reference
+                </span>
+            </div>
+            <p class="mt-2 text-sm text-slate-600 leading-relaxed">
+                Use this guide when reviewing records in the <span class="font-semibold">Audit and History (PDF uploads)</span> table.
+            </p>
+
+            <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200">
+                <table class="min-w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-900">
+                            <th class="text-left p-3 border-b border-slate-200 w-52">Field</th>
+                            <th class="text-left p-3 border-b border-slate-200">Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="align-top">
+                            <td class="p-3 border-b border-slate-100 font-semibold">ID</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Document record ID. Example: <span class="font-semibold">4</span>.</td>
+                        </tr>
+                        <tr class="align-top bg-slate-50/50">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Filename</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">The uploaded PDF name. Example: <span class="font-semibold">Train2 yabatech 2018-2020 session Pages.pdf</span>.</td>
+                        </tr>
+                        <tr class="align-top">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Session</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Session value extracted or manually supplied. If blank, no session value was saved.</td>
+                        </tr>
+                        <tr class="align-top bg-slate-50/50">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Status</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700"><span class="font-semibold">complete</span> means processing finished successfully without failure.</td>
+                        </tr>
+                        <tr class="align-top">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Pages</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Format example: <span class="font-semibold">1-2 (2) / 2</span>.</td>
+                        </tr>
+                        <tr class="align-top bg-slate-50/50">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Results</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Number of pages that produced extraction results. Example: <span class="font-semibold">2</span> means both pages returned results.</td>
+                        </tr>
+                        <tr class="align-top">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Credits</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Format example: <span class="font-semibold">res 2 | cons 2 | ref 0</span>.</td>
+                        </tr>
+                        <tr class="align-top bg-slate-50/50">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Credit status</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700"><span class="font-semibold">finalized</span> means credit accounting is complete and closed.</td>
+                        </tr>
+                        <tr class="align-top">
+                            <td class="p-3 border-b border-slate-100 font-semibold">CSV / XLSX</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700"><span class="font-semibold">Download</span> indicates output files were generated and are available for download.</td>
+                        </tr>
+                        <tr class="align-top bg-slate-50/50">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Created</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Timestamp when the document record was created. Example: <span class="font-semibold">3/24/2026, 5:56:57 PM</span>.</td>
+                        </tr>
+                        <tr class="align-top">
+                            <td class="p-3 border-b border-slate-100 font-semibold">Failure reason</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">If blank, no error path was triggered.</td>
+                        </tr>
+                        <tr class="align-top bg-slate-50/50">
+                            <td class="p-3 border-b border-slate-100 font-semibold">API tier</td>
+                            <td class="p-3 border-b border-slate-100 text-slate-700">Gemini key tier used for the job. Example: <span class="font-semibold">paid_1</span>.</td>
+                        </tr>
+                        <tr class="align-top">
+                            <td class="p-3 font-semibold">Actions</td>
+                            <td class="p-3 text-slate-700"><span class="font-semibold">Delete</span> removes the document record and stored outputs.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+                    <h4 class="text-sm font-bold text-cyan-900">Pages Field Breakdown</h4>
+                    <p class="mt-2 text-sm text-cyan-800 leading-relaxed">
+                        <span class="font-semibold">1-2</span> = requested page range (start to end),
+                        <span class="font-semibold">(2)</span> = <span class="font-mono">pages_requested</span>,
+                        <span class="font-semibold">/ 2</span> = <span class="font-mono">pages_processed</span>.
+                    </p>
+                </div>
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <h4 class="text-sm font-bold text-amber-900">Credits Field Breakdown</h4>
+                    <p class="mt-2 text-sm text-amber-800 leading-relaxed">
+                        <span class="font-semibold">res 2</span> = 2 credits reserved at upload start,
+                        <span class="font-semibold">cons 2</span> = 2 credits consumed after success,
+                        <span class="font-semibold">ref 0</span> = 0 credits refunded.
+                    </p>
+                </div>
+            </div>
+        </section>
     </main>
 
     <footer class="text-center text-slate-700 py-6">
