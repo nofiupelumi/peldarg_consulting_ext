@@ -27,6 +27,7 @@ class DocumentController extends Controller
     {
         $settings = AppSetting::current();
         $maxUploadKb = $settings->effectiveMaxUploadMb() * 1024;
+        $maxUploadMb = $settings->effectiveMaxUploadMb();
 
         $req->validate([
             'file' => 'required|mimes:pdf|max:' . $maxUploadKb,
@@ -34,6 +35,12 @@ class DocumentController extends Controller
             'start_page' => 'nullable|integer|min:1',
             'end_page' => 'nullable|integer|min:1|gte:start_page',
             'api_tier' => 'required|string|in:paid_1,paid_2,paid_3',
+        ], [
+            'file.required' => 'No PDF file was received. If your file is large, increase PHP upload_max_filesize and post_max_size on the server.',
+            'file.mimes' => 'Only PDF files are allowed.',
+            'file.max' => 'PDF is too large. Maximum allowed is ' . $maxUploadMb . 'MB.',
+            'api_tier.required' => 'Please select an API Key Tier.',
+            'api_tier.in' => 'Selected API Key Tier is invalid.',
         ]);
         $userId = (int) $req->session()->get('user_id');
         $user = User::findOrFail($userId);

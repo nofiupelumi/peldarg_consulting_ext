@@ -68,6 +68,27 @@ function setGateMessage({ text, tone }){
   gate.classList.add(tone || 'text-gray-700')
 }
 
+function extractApiErrorMessage(data, fallback = 'Request failed') {
+  if (!data || typeof data !== 'object') return fallback
+  if (typeof data.message === 'string' && data.message.trim() !== '') {
+    // Laravel validation often returns a generic message here; prefer field-level errors below.
+    if (data.message !== 'The given data was invalid.') return data.message
+  }
+
+  const errors = data.errors
+  if (errors && typeof errors === 'object') {
+    const keys = Object.keys(errors)
+    for (const key of keys) {
+      const val = errors[key]
+      if (Array.isArray(val) && val.length > 0) return String(val[0])
+      if (typeof val === 'string' && val.trim() !== '') return val
+    }
+  }
+
+  if (typeof data.error === 'string' && data.error.trim() !== '') return data.error
+  return fallback
+}
+
 function validateAndComputePagesRequested(){
   const pageError = $('#pageValidationError')
   const sp = parseInt($('#page_start')?.value?.trim() || '0', 10)
@@ -531,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
           updateUploadGate()
         }, 2000)
       } else {
-        throw new Error(result.message || result.error || 'Upload failed')
+        throw new Error(extractApiErrorMessage(result, 'Upload failed'))
       }
     } catch(err){
       uploadProgress.classList.add('hidden')
