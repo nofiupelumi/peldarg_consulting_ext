@@ -8,6 +8,7 @@ use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class CreditInvoiceController extends Controller
 {
@@ -50,7 +51,10 @@ class CreditInvoiceController extends Controller
 
         $proofPath = null;
         if ($request->hasFile('proof')) {
-            $proofPath = $request->file('proof')->store('invoice-proofs');
+            $proof = $request->file('proof');
+            $originalExt = strtolower((string) $proof->getClientOriginalExtension());
+            $ext = in_array($originalExt, ['jpg', 'jpeg', 'png', 'pdf'], true) ? $originalExt : 'bin';
+            $proofPath = $proof->storeAs('invoice-proofs', (string) Str::uuid() . '.' . $ext);
         }
 
         $settings = AppSetting::current();

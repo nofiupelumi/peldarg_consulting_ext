@@ -90,7 +90,8 @@ class DocumentController extends Controller
         }
         $pagesRequested = ($effectiveEnd - $effectiveStart) + 1;
 
-        $path = $file->store('convocation', 'public');
+        // Use explicit extension to avoid mime-extension guessing that depends on PHP fileinfo.
+        $path = $file->storeAs('convocation', (string) Str::uuid() . '.pdf', 'public');
 
         $requestId = (string) Str::uuid();
 

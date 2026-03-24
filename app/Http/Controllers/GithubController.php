@@ -8,6 +8,7 @@ use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class GithubController extends Controller
 {
@@ -145,7 +146,7 @@ class GithubController extends Controller
         $docxFile = $req->file('docx');
 
         if ($csvFile) {
-            $csvPath = $csvFile->store('processed', 'public');
+            $csvPath = $csvFile->storeAs('processed', (string) Str::uuid() . '.csv', 'public');
             $doc->csv_url = Storage::disk('public')->url($csvPath);
 
             if (($h = fopen(Storage::disk('public')->path($csvPath), 'r')) !== false) {
@@ -167,8 +168,8 @@ class GithubController extends Controller
                 fclose($h);
             }
         }
-        if ($xlsxFile) { $xlsxPath = $xlsxFile->store('processed', 'public'); $doc->xlsx_url = Storage::disk('public')->url($xlsxPath); }
-        if ($docxFile) { $docxPath = $docxFile->store('processed', 'public'); $doc->docx_url = Storage::disk('public')->url($docxPath); }
+        if ($xlsxFile) { $xlsxPath = $xlsxFile->storeAs('processed', (string) Str::uuid() . '.xlsx', 'public'); $doc->xlsx_url = Storage::disk('public')->url($xlsxPath); }
+        if ($docxFile) { $docxPath = $docxFile->storeAs('processed', (string) Str::uuid() . '.docx', 'public'); $doc->docx_url = Storage::disk('public')->url($docxPath); }
 
         $summary = json_decode((string) $req->input('summary', '{}'), true);
         $counts = is_array($summary['counts'] ?? null) ? $summary['counts'] : [];
