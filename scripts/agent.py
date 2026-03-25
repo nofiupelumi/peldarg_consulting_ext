@@ -84,6 +84,8 @@ class ConvocationPDFExtractor:
         self.model = genai.GenerativeModel('gemini-2.5-flash')
         self.session = (session or "").strip()
         self.extraction_log = []
+        # Use more retries for transient upstream model pressure/timeouts (503/504).
+        self.transient_retry_count = 6
         # Track last known context across pages to handle pages with only names
         self.last_context: Dict[str, Optional[str]] = {
             'faculty': None,
@@ -351,10 +353,11 @@ Return ONLY a JSON object. No explanations."""
             List of student record dictionaries
         """
         prompt = self.create_extraction_prompt(page_num, total_pages, prev_context)
+        max_attempts = max(retry_count, self.transient_retry_count)
 
-        for attempt in range(retry_count):
+        for attempt in range(max_attempts):
             try:
-                print(f"  🔍 Analyzing page {page_num} (Attempt {attempt + 1}/{retry_count})...")
+                print(f"  🔍 Analyzing page {page_num} (Attempt {attempt + 1}/{max_attempts})...")
                 
                 # Send to Gemini with image
                 response = self.model.generate_content([prompt, image])
@@ -407,20 +410,60 @@ Return ONLY a JSON object. No explanations."""
                 time.sleep(2)  # Wait before retry
                 
             except Exception as e:
-                print(f"  ⚠️ Error on attempt {attempt + 1}: {str(e)}")
-                if attempt == retry_count - 1:
-                    print(f"  ❌ Failed to process page {page_num}: {str(e)}")
+                error_text = str(e)
+                is_transient = self._is_transient_model_error(error_text)
+                allowed_attempts = self.transient_retry_count if is_transient else retry_count
+
+                print(f"  ⚠️ Error on attempt {attempt + 1}: {error_text}")
+                if is_transient and attempt + 1 < allowed_attempts:
+                    backoff_seconds = min(30, 2 ** min(attempt, 4))
+                    print(
+                        f"  🔁 Transient model error detected (503/504). "
+                        f"Retrying in {backoff_seconds}s..."
+                    )
+                    time.sleep(backoff_seconds)
+                    continue
+
+                if attempt == allowed_attempts - 1:
+                    print(f"  ❌ Failed to process page {page_num}: {error_text}")
                     self.extraction_log.append({
                         "page": page_num,
                         "students_found": 0,
                         "attempt": attempt + 1,
                         "status": "failed",
-                        "error": str(e)
+                        "error": error_text
                     })
                     return []
                 time.sleep(2)
         
         return []
+
+    @staticmethod
+    def _is_transient_model_error(error_text: str) -> bool:
+        """Detect upstream transient Gemini failures that deserve extra retries."""
+        msg = (error_text or "").lower()
+        transient_signals = [
+            "503",
+            "504",
+            "service unavailable",
+            "high demand",
+            "request timed out",
+            "deadline exceeded",
+            "timeout",
+        ]
+        return any(signal in msg for signal in transient_signals)
+
+    def _latest_page_log_entry(self, page_num: int) -> Optional[Dict[str, Any]]:
+        """Return the latest extraction log entry for a specific page."""
+        for entry in reversed(self.extraction_log):
+            if entry.get("page") == page_num:
+                return entry
+        return None
+
+    def _was_page_extraction_failed(self, page_num: int) -> bool:
+        """Check whether the latest extraction attempt for the page failed."""
+        latest = self._latest_page_log_entry(page_num)
+        return bool(latest and latest.get("status") == "failed")
 
     # ------------------------------------------------------------------
     # Context helpers
@@ -599,6 +642,7 @@ Return ONLY a JSON object. No explanations."""
         
         # Extract from each page with cross-page context retention
         all_records = []
+        failed_page_jobs: List[Tuple[int, Image.Image, Dict[str, Optional[str]]]] = []
         # Start with any persisted context from previous runs within this instance
         page_context = dict(self.last_context)
         
@@ -623,8 +667,14 @@ Return ONLY a JSON object. No explanations."""
                     self.last_context['session'] = detected_session
                     # Do not update a global session that could overwrite earlier records.
 
+            # Keep a snapshot of the context used for this page so failed pages can be retried later.
+            page_context_snapshot = dict(page_context)
+
             # Pass previous context to the prompt/model
             records = self.extract_from_page(image, page_num, len(images), prev_context=page_context)
+
+            if self._was_page_extraction_failed(page_num):
+                failed_page_jobs.append((page_num, image, page_context_snapshot))
 
             # Fill missing headers using last known context
             records = self._fill_missing_from_context(records, page_context)
@@ -637,6 +687,35 @@ Return ONLY a JSON object. No explanations."""
             
             # Rate limiting to avoid API throttling
             time.sleep(1)
+
+        # Final rerun pass for pages that exhausted retries in the first pass.
+        if failed_page_jobs:
+            print(f"\n🔁 Final failed-page rerun pass: {len(failed_page_jobs)} page(s)")
+            recovered_pages = 0
+            for page_num, image, rerun_context in failed_page_jobs:
+                print(f"  🔁 Re-running failed page {page_num}...")
+                rerun_records = self.extract_from_page(
+                    image,
+                    page_num,
+                    len(images),
+                    retry_count=self.transient_retry_count,
+                    prev_context=rerun_context,
+                )
+
+                if self._was_page_extraction_failed(page_num):
+                    print(f"  ❌ Page {page_num} still failed after final rerun pass")
+                    continue
+
+                # If rerun succeeded, apply the same context-filling behavior before adding.
+                rerun_records = self._fill_missing_from_context(rerun_records, rerun_context)
+                all_records.extend(rerun_records)
+                recovered_pages += 1
+                print(f"  ✅ Recovered page {page_num} with {len(rerun_records)} student(s)")
+
+            print(
+                f"✅ Final rerun pass complete: recovered {recovered_pages}/"
+                f"{len(failed_page_jobs)} previously failed page(s)"
+            )
         
         # Post-process records
         processed_records = self.post_process_records(all_records)
