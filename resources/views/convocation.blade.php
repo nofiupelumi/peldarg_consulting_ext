@@ -39,6 +39,16 @@
         </div>
     </header>
 
+    @php
+        $uploadLimitRaw = ini_get('upload_max_filesize') ?: '40M';
+        $postLimitRaw = ini_get('post_max_size') ?: '40M';
+        preg_match('/^(\d+)/', $uploadLimitRaw, $uploadMatch);
+        preg_match('/^(\d+)/', $postLimitRaw, $postMatch);
+        $uploadLimitMb = isset($uploadMatch[1]) ? (int) $uploadMatch[1] : 40;
+        $postLimitMb = isset($postMatch[1]) ? (int) $postMatch[1] : 40;
+        $effectiveUploadLimitMb = max(1, min($uploadLimitMb, $postLimitMb));
+    @endphp
+
     <main class="max-w-7xl mx-auto px-6 py-6">
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="rounded-xl p-5 border border-white/10 bg-slate-950 text-white shadow-sm">
@@ -88,12 +98,12 @@
                     How To Use
                 </a>
             </div>
-            <form id="uploadForm" class="space-y-3" method="POST" action="javascript:void(0);" onsubmit="return false;" data-credit-balance="{{ (int) ($creditBalance ?? 0) }}">
+            <form id="uploadForm" class="space-y-3" method="POST" action="javascript:void(0);" onsubmit="return false;" data-credit-balance="{{ (int) ($creditBalance ?? 0) }}" data-max-upload-mb="{{ $effectiveUploadLimitMb }}">
                 @csrf
                 <div class="flex flex-col gap-2">
                     <label for="file" class="font-medium">PDF File</label>
                     <input id="file" name="file" type="file" accept="application/pdf" required class="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-amber-400" />
-                    <small class="text-gray-500 text-xs">Max upload size: 100MB (PDF only)</small>
+                    <small class="text-gray-500 text-xs">Server upload limit: {{ $effectiveUploadLimitMb }}MB (PDF only)</small>
                 </div>
                 <div class="flex flex-col gap-2">
                     <label for="session" class="font-medium">Session (optional)</label>
