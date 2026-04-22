@@ -336,6 +336,13 @@ class DocumentController extends Controller
         $pat  = (string) config('services.github.pat');
         $repo = 'nofiupelumi/peldarg_consulting_ext';
 
+        if (empty($pat)) {
+            Log::error('recover-artifact: GitHub PAT not configured', ['doc_id' => $doc->id]);
+            return response()->json([
+                'error' => 'GitHub token is not configured on this server. Contact your administrator to set GITHUB_PAT environment variable.'
+            ], 503);
+        }
+
         // Step 1: get the redirect URL for the artifact zip.
         $apiUrl   = "https://api.github.com/repos/{$repo}/actions/artifacts/{$artifactId}/zip";
         $response = Http::withToken($pat)
@@ -353,8 +360,12 @@ class DocumentController extends Controller
                 'doc_id'      => $doc->id,
                 'artifact_id' => $artifactId,
                 'status'      => $response->status(),
+                'pat_configured' => !empty($pat),
             ]);
-            return response()->json(['error' => 'Could not fetch artifact URL from GitHub (HTTP ' . $response->status() . ')'], 502);
+            $statusMsg = $response->status() === 401
+                ? 'Invalid or expired GitHub token. Contact your administrator.'
+                : 'Could not fetch artifact from GitHub (HTTP ' . $response->status() . ')';
+            return response()->json(['error' => $statusMsg], 502);
         }
 
         // Step 2: download the zip (follow redirect now).
@@ -363,7 +374,15 @@ class DocumentController extends Controller
             ->get((string) $zipUrl);
 
         if (!$zipResponse->successful()) {
-            return response()->json(['error' => 'Could not download artifact zip (HTTP ' . $zipResponse->status() . ')'], 502);
+            Log::error('recover-artifact: failed to download zip', [
+                'doc_id'      => $doc->id,
+                'artifact_id' => $artifactId,
+                'status'      => $zipResponse->status(),
+            ]);
+            $statusMsg = $zipResponse->status() === 401
+                ? 'Invalid or expired GitHub token. Contact your administrator.'
+                : 'Could not download artifact from GitHub (HTTP ' . $zipResponse->status() . ')';
+            return response()->json(['error' => $statusMsg], 502);
         }
 
         // Step 3: unzip in memory and extract CSV/XLSX.
