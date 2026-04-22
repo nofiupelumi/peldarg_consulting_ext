@@ -22,6 +22,7 @@ Route::middleware(['web', 'App\Http\Middleware\CheckAuth'])->group(function () {
     Route::get('/documents', [DocumentController::class, 'index']);
     Route::get('/booklet-logs', [BookletLogController::class, 'index']);
     Route::delete('/documents/{doc}', [DocumentController::class, 'delete']);
+    Route::post('/documents/{doc}/recover-artifact', [DocumentController::class, 'recoverArtifact']);
 
     Route::get('/credit-summary', [UserCreditController::class, 'summary']);
     Route::get('/credit-ledger', [UserCreditController::class, 'ledger']);

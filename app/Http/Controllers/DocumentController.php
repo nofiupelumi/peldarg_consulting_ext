@@ -316,6 +316,116 @@ class DocumentController extends Controller
         return $docs;
     }
 
+    /**
+     * Recover CSV/XLSX outputs from a GitHub Actions artifact for a completed
+     * document whose upload-results callback failed (csv_url/xlsx_url are null).
+     *
+     * POST body: { artifact_id: "6531056114" }
+     */
+    public function recoverArtifact(Request $req, Document $doc)
+    {
+        $isAdmin = (bool) $req->session()->get('is_admin');
+        $userId  = (int)  $req->session()->get('user_id');
+        if (!$isAdmin && (int) $doc->user_id !== $userId) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+
+        $req->validate(['artifact_id' => 'required|string|max:40']);
+        $artifactId = $req->input('artifact_id');
+
+        $pat  = (string) config('services.github.pat');
+        $repo = 'nofiupelumi/peldarg_consulting_ext';
+
+        // Step 1: get the redirect URL for the artifact zip.
+        $apiUrl   = "https://api.github.com/repos/{$repo}/actions/artifacts/{$artifactId}/zip";
+        $response = Http::withToken($pat)
+            ->withOptions(['allow_redirects' => false])
+            ->withHeaders(['Accept' => 'application/vnd.github+json'])
+            ->get($apiUrl);
+
+        if ($response->status() === 302) {
+            $zipUrl = $response->header('Location');
+        } elseif ($response->successful()) {
+            // Some clients follow redirects automatically
+            $zipUrl = $apiUrl;
+        } else {
+            Log::error('recover-artifact: failed to get artifact URL', [
+                'doc_id'      => $doc->id,
+                'artifact_id' => $artifactId,
+                'status'      => $response->status(),
+            ]);
+            return response()->json(['error' => 'Could not fetch artifact URL from GitHub (HTTP ' . $response->status() . ')'], 502);
+        }
+
+        // Step 2: download the zip (follow redirect now).
+        $zipResponse = Http::withToken($pat)
+            ->withOptions(['allow_redirects' => true])
+            ->get((string) $zipUrl);
+
+        if (!$zipResponse->successful()) {
+            return response()->json(['error' => 'Could not download artifact zip (HTTP ' . $zipResponse->status() . ')'], 502);
+        }
+
+        // Step 3: unzip in memory and extract CSV/XLSX.
+        $tmpZip = tempnam(sys_get_temp_dir(), 'gh_artifact_') . '.zip';
+        file_put_contents($tmpZip, $zipResponse->body());
+
+        $zip = new \ZipArchive();
+        if ($zip->open($tmpZip) !== true) {
+            @unlink($tmpZip);
+            return response()->json(['error' => 'Failed to open artifact zip'], 500);
+        }
+
+        $savedCsv = false;
+        $savedXlsx = false;
+        $base = pathinfo($doc->filename, PATHINFO_FILENAME);
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            $ext  = strtolower(pathinfo((string) $name, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['csv', 'xlsx'], true)) {
+                continue;
+            }
+            $contents = $zip->getFromIndex($i);
+            if ($contents === false) {
+                continue;
+            }
+            $storedName = Str::uuid() . '.' . $ext;
+            $storedPath = 'processed/' . $storedName;
+            Storage::disk('public')->put($storedPath, $contents);
+            $url = Storage::disk('public')->url($storedPath);
+            if ($ext === 'csv' && !$doc->csv_url) {
+                $doc->csv_url = $url;
+                $savedCsv = true;
+            } elseif ($ext === 'xlsx' && !$doc->xlsx_url) {
+                $doc->xlsx_url = $url;
+                $savedXlsx = true;
+            }
+        }
+
+        $zip->close();
+        @unlink($tmpZip);
+
+        if (!$savedCsv && !$savedXlsx) {
+            return response()->json(['error' => 'No CSV or XLSX files found in the artifact zip'], 422);
+        }
+
+        $doc->save();
+
+        Log::info('recover-artifact: restored output URLs', [
+            'doc_id'      => $doc->id,
+            'artifact_id' => $artifactId,
+            'csv'         => $doc->csv_url,
+            'xlsx'        => $doc->xlsx_url,
+        ]);
+
+        return response()->json([
+            'ok'   => true,
+            'csv'  => $doc->csv_url ? true : false,
+            'xlsx' => $doc->xlsx_url ? true : false,
+        ]);
+    }
+
     public function delete(Request $req, Document $doc)
     {
         $isAdmin = (bool) $req->session()->get('is_admin');

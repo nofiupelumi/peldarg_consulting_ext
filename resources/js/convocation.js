@@ -670,6 +670,7 @@ function renderDocs(list){
       td(new Date(d.created_at).toLocaleString()),
       td(d.failed_reason || ''),
       td(d.api_tier || ''),
+      tdRecover(d),
       tdDelete(d.id)
     )
     tbody.appendChild(tr)
@@ -726,6 +727,45 @@ function tdLink(url, format){
   }
   return d
 }
+function tdRecover(d){
+  const cell = document.createElement('td'); cell.className='p-2 border-b';
+  const needsRecover = (d.status === 'complete' || d.status === 'finalized') && !d.csv_download && !d.xlsx_download;
+  if (!needsRecover) return cell;
+  const btn = document.createElement('button');
+  btn.textContent = 'Recover Files';
+  btn.className = 'text-blue-600 hover:text-blue-800 underline text-sm';
+  btn.onclick = async () => {
+    const artifactId = prompt('Paste the GitHub Actions artifact ID (numbers only):');
+    if (!artifactId || !artifactId.trim()) return;
+    btn.textContent = 'Recovering...';
+    btn.disabled = true;
+    try {
+      const csrfToken = document.querySelector('input[name="_token"]')?.value;
+      const res = await fetch(`/documents/${d.id}/recover-artifact`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ artifact_id: artifactId.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Recovery failed');
+      alert('Files recovered successfully! The download links will appear after the page refreshes.');
+      loadDocs({ fromPoll: false });
+    } catch(err) {
+      alert('Recovery failed: ' + (err.message || 'Unknown error'));
+      btn.textContent = 'Recover Files';
+      btn.disabled = false;
+    }
+  };
+  cell.appendChild(btn);
+  return cell;
+}
+
 function tdDelete(id){
   const d=document.createElement('td'); d.className='p-2 border-b'
   const btn=document.createElement('button');
