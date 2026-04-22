@@ -503,12 +503,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const sp = parseInt($('#page_start')?.value?.trim() || '0', 10)
     const ep = parseInt($('#page_end')?.value?.trim() || '0', 10)
     
-    const fd = new FormData()
-    fd.append('file', f)
-    if ($('#session')?.value) fd.append('session', $('#session').value)
-    if ($('#api_tier')?.value) fd.append('api_tier', $('#api_tier').value)
-    if (sp > 0) fd.append('start_page', sp)
-    if (ep > 0) fd.append('end_page', ep)
+    // Helper builds a fresh FormData for each attempt; a body stream can only be sent once.
+    const buildFormData = () => {
+      const fd = new FormData()
+      fd.append('file', f)
+      if ($('#session')?.value) fd.append('session', $('#session').value)
+      if ($('#api_tier')?.value) fd.append('api_tier', $('#api_tier').value)
+      if (sp > 0) fd.append('start_page', sp)
+      if (ep > 0) fd.append('end_page', ep)
+      return fd
+    }
     
     // Get CSRF token
     const csrfToken = document.querySelector('input[name="_token"]')?.value
@@ -553,7 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'X-Requested-With': 'XMLHttpRequest'
         },
         credentials: 'same-origin',
-        body: fd 
+        body: buildFormData()
       })
 
       // Some hosting firewalls block multipart POST to /api/* with 403.
@@ -567,7 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
             'X-Requested-With': 'XMLHttpRequest'
           },
           credentials: 'same-origin',
-          body: fd
+          body: buildFormData()
         })
       }
 
