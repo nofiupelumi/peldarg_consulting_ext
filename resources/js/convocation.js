@@ -10,6 +10,9 @@ const API = {
   summary: '/api/credit-summary',
 }
 
+const AUTO_SPLIT_PAGE_THRESHOLD = 17
+const AUTO_SPLIT_CHUNK_SIZE = 10
+
 function $(sel){ return document.querySelector(sel) }
 function el(tag, attrs={}){ const e=document.createElement(tag); Object.assign(e, attrs); return e }
 
@@ -90,6 +93,102 @@ function extractApiErrorMessage(data, fallback = 'Request failed') {
   return fallback
 }
 
+function buildUploadFormData({ file, sessionValue, apiTier, startPage, endPage }) {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (sessionValue) fd.append('session', sessionValue)
+  if (apiTier) fd.append('api_tier', apiTier)
+  if (startPage > 0) fd.append('start_page', startPage)
+  if (endPage > 0) fd.append('end_page', endPage)
+  return fd
+}
+
+async function sendUploadRequest(payload, csrfToken) {
+  let response = await fetch(API.upload, {
+    method: 'POST',
+    headers: {
+      'X-CSRF-TOKEN': csrfToken,
+      'Accept': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    credentials: 'same-origin',
+    body: buildUploadFormData(payload)
+  })
+
+  if (response.status === 403) {
+    response = await fetch(API.uploadFallback, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      credentials: 'same-origin',
+      body: buildUploadFormData(payload)
+    })
+  }
+
+  return response
+}
+
+async function queueUpload(payload, csrfToken) {
+  const response = await sendUploadRequest(payload, csrfToken)
+
+  if (response.status === 413) {
+    throw new Error('File is too large for server upload limit. Please reduce PDF size or increase server limits (Nginx client_max_body_size / PHP upload_max_filesize, post_max_size).')
+  }
+  if (response.status === 401) {
+    return { unauthorized: true }
+  }
+  if (response.status === 403) {
+    throw new Error('Access denied (403). The server or firewall blocked this upload. For larger PDFs, use smaller chunks or ask admin to relax upload/WAF rules.')
+  }
+
+  const contentType = response.headers.get('content-type')
+  if (!contentType || !contentType.includes('application/json')) {
+    throw new Error('Server returned non-JSON response. Check if you are logged in.')
+  }
+
+  const result = await response.json()
+  if (!response.ok) {
+    throw new Error(extractApiErrorMessage(result, 'Upload failed'))
+  }
+
+  return { result }
+}
+
+async function splitPdfIntoChunks(file, chunkSize) {
+  const bytes = await file.arrayBuffer()
+  const sourcePdf = await PDFDocument.load(bytes, { ignoreEncryption: true })
+  const pageCount = sourcePdf.getPageCount()
+  const chunkCount = Math.ceil(pageCount / chunkSize)
+  const baseName = file.name.replace(/\.pdf$/i, '')
+  const chunks = []
+
+  for (let start = 0; start < pageCount; start += chunkSize) {
+    const end = Math.min(start + chunkSize, pageCount)
+    const chunkPdf = await PDFDocument.create()
+    const pageIndexes = Array.from({ length: end - start }, (_, index) => start + index)
+    const copiedPages = await chunkPdf.copyPages(sourcePdf, pageIndexes)
+    copiedPages.forEach((page) => chunkPdf.addPage(page))
+
+    const chunkBytes = await chunkPdf.save()
+    const chunkNumber = Math.floor(start / chunkSize) + 1
+    const chunkName = `${baseName} - part ${chunkNumber} of ${chunkCount}.pdf`
+    const chunkFile = new File([chunkBytes], chunkName, { type: 'application/pdf' })
+
+    chunks.push({
+      file: chunkFile,
+      chunkNumber,
+      chunkCount,
+      pageStart: start + 1,
+      pageEnd: end,
+    })
+  }
+
+  return chunks
+}
+
 function validateAndComputePagesRequested(){
   const pageError = $('#pageValidationError')
   const sp = parseInt($('#page_start')?.value?.trim() || '0', 10)
@@ -159,9 +258,13 @@ function updateUploadGate(){
     return
   }
 
+  const largePdfHint = totalPages >= AUTO_SPLIT_PAGE_THRESHOLD
+    ? `Need ${computed} credits, you have ${balance}. Large PDF will auto-upload in ${AUTO_SPLIT_CHUNK_SIZE}-page chunks.`
+    : `Need ${computed} credits, you have ${balance}.`
+
   uploadBtn.disabled = false
   setGateMessage({
-    text: `Need ${computed} credits, you have ${balance}.`,
+    text: largePdfHint,
     tone: 'text-amber-700',
   })
 }
@@ -502,17 +605,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const sp = parseInt($('#page_start')?.value?.trim() || '0', 10)
     const ep = parseInt($('#page_end')?.value?.trim() || '0', 10)
-    
-    // Helper builds a fresh FormData for each attempt; a body stream can only be sent once.
-    const buildFormData = () => {
-      const fd = new FormData()
-      fd.append('file', f)
-      if ($('#session')?.value) fd.append('session', $('#session').value)
-      if ($('#api_tier')?.value) fd.append('api_tier', $('#api_tier').value)
-      if (sp > 0) fd.append('start_page', sp)
-      if (ep > 0) fd.append('end_page', ep)
-      return fd
-    }
+    const sessionValue = $('#session')?.value || ''
+    const apiTier = $('#api_tier')?.value || ''
+    const manualRangeSelected = sp > 0 || ep > 0
+    const shouldAutoSplit = !manualRangeSelected && Number.isFinite(totalPages) && totalPages >= AUTO_SPLIT_PAGE_THRESHOLD
     
     // Get CSRF token
     const csrfToken = document.querySelector('input[name="_token"]')?.value
@@ -549,55 +645,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }, 200)
 
-      let r = await fetch(API.upload, { 
-        method:'POST', 
-        headers: {
-          'X-CSRF-TOKEN': csrfToken,
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        credentials: 'same-origin',
-        body: buildFormData()
-      })
+      if (shouldAutoSplit) {
+        progressText.textContent = `Preparing ${AUTO_SPLIT_CHUNK_SIZE}-page chunks...`
+        const chunks = await splitPdfIntoChunks(f, AUTO_SPLIT_CHUNK_SIZE)
 
-      // Some hosting firewalls block multipart POST to /api/* with 403.
-      // Retry once on a web route guarded by the same auth middleware.
-      if (r.status === 403) {
-        r = await fetch(API.uploadFallback, {
-          method:'POST',
-          headers: {
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          credentials: 'same-origin',
-          body: buildFormData()
-        })
-      }
+        for (let index = 0; index < chunks.length; index += 1) {
+          const chunk = chunks[index]
+          progressText.textContent = `Uploading chunk ${index + 1}/${chunks.length} (pages ${chunk.pageStart}-${chunk.pageEnd})...`
+          progressBar.style.width = `${Math.round((index / chunks.length) * 100)}%`
 
-      if (r.status === 413) {
-        throw new Error('File is too large for server upload limit. Please reduce PDF size or increase server limits (Nginx client_max_body_size / PHP upload_max_filesize, post_max_size).')
-      }
-      if (r.status === 401) {
-        handleUnauthorized()
-        return
-      }
-      if (r.status === 403) {
-        throw new Error('Access denied (403). Your session may have expired or the server blocked this request. Please refresh and log in again.')
-      }
-      
-      if (progressInterval) clearInterval(progressInterval)
-      progressBar.style.width = '100%'
-      
-      // Check if response is JSON
-      const contentType = r.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Server returned non-JSON response. Check if you are logged in.')
-      }
-      
-      const result = await r.json()
-      
-      if (r.ok) {
+          const { unauthorized, result } = await queueUpload({
+            file: chunk.file,
+            sessionValue,
+            apiTier,
+            startPage: 0,
+            endPage: 0,
+          }, csrfToken)
+
+          if (unauthorized) {
+            handleUnauthorized()
+            return
+          }
+
+          if (typeof result?.credit_balance === 'number') {
+            setCreditBalance(result.credit_balance)
+          }
+        }
+
+        if (progressInterval) clearInterval(progressInterval)
+        progressBar.style.width = '100%'
+        progressText.textContent = 'Upload complete! All chunks queued for processing...'
+        if (msg) {
+          msg.textContent = `Queued ${chunks.length} PDF chunks for processing. Refresh documents shortly.`
+          msg.className = 'mt-3 text-sm text-green-700'
+        }
+      } else {
+        const { unauthorized, result } = await queueUpload({
+          file: f,
+          sessionValue,
+          apiTier,
+          startPage: sp,
+          endPage: ep,
+        }, csrfToken)
+
+        if (unauthorized) {
+          handleUnauthorized()
+          return
+        }
+
+        if (progressInterval) clearInterval(progressInterval)
+        progressBar.style.width = '100%'
         progressText.textContent = 'Upload complete! Processing...'
         if (msg) {
           msg.textContent = 'Queued for processing. Refresh documents shortly.'
@@ -607,18 +704,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof result?.credit_balance === 'number') {
           setCreditBalance(result.credit_balance)
         }
-
-        setTimeout(() => {
-          uploadProgress.classList.add('hidden')
-          loadDocs({ fromPoll: false })
-          up.reset()
-          totalPages = null
-          pagesRequested = null
-          updateUploadGate()
-        }, 2000)
-      } else {
-        throw new Error(extractApiErrorMessage(result, 'Upload failed'))
       }
+
+      setTimeout(() => {
+        uploadProgress.classList.add('hidden')
+        loadDocs({ fromPoll: false })
+        up.reset()
+        totalPages = null
+        pagesRequested = null
+        updateUploadGate()
+      }, 2000)
     } catch(err){
       if (progressInterval) clearInterval(progressInterval)
       uploadProgress.classList.add('hidden')
