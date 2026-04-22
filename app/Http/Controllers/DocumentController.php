@@ -337,9 +337,9 @@ class DocumentController extends Controller
         $repo = 'nofiupelumi/peldarg_consulting_ext';
 
         if (empty($pat)) {
-            Log::error('recover-artifact: GitHub PAT not configured', ['doc_id' => $doc->id]);
+            Log::error('recover-artifact: GitHub token not configured', ['doc_id' => $doc->id]);
             return response()->json([
-                'error' => 'GitHub token is not configured on this server. Contact your administrator to set GITHUB_PAT environment variable.'
+                'error' => 'GitHub token is not configured on this server. Contact your administrator to set GH_ARTIFACT_TOKEN environment variable.'
             ], 503);
         }
 

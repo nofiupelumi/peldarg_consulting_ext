@@ -36,7 +36,7 @@ return [
     ],
 
     'github' => [
-        'pat' => env('GITHUB_PAT'),
+        'pat' => env('GH_ARTIFACT_TOKEN'),
         'dispatch_repo' => env('GITHUB_DISPATCH_REPO', 'nofiupelumi/peldarg_consulting_ext'),
     ],
 

@@ -1,3 +1,24 @@
+GitHub dispatch (server-side):
+- `GH_ARTIFACT_TOKEN=...` (GitHub Personal Access Token with repo read access)
+- `GITHUB_DISPATCH_REPO=nofiupelumi/peldarg_consulting_ext`
+### Required `.env` on server
+
+Place this at `/home/peldargc/extraction_app/.env` (the script will copy it to each release):
+- `APP_ENV=production`
+- `APP_DEBUG=false`
+- `APP_URL=https://extraction.peldargconsulting.com`
+- `DB_CONNECTION=mysql`
+- `DB_HOST=...`
+- `DB_PORT=3306`
+- `DB_DATABASE=...`
+- `DB_USERNAME=...`
+- `DB_PASSWORD=...`
+- `SESSION_DRIVER=database`
+- `CACHE_STORE=database`
+- `QUEUE_CONNECTION=database`
+- `MAIL_*` values for your SMTP
+- `GH_ARTIFACT_TOKEN`, `GITHUB_DISPATCH_REPO`
+- `RESULT_UPLOAD_TOKEN`, `CALLBACK_HMAC_SECRET`
 # cPanel Deployment (extraction.peldargconsulting.com)
 
 This repo contains:

@@ -19,7 +19,7 @@ End‑to‑end pipeline: upload a Convocation PDF in the Laravel app, process it
    - DB_DATABASE=ai_agent_secondlevel_verification
    - DB_USERNAME=root
    - DB_PASSWORD=
-   - GITHUB_PAT=your_pat_with_repo_write
+   - GH_ARTIFACT_TOKEN=your_ghp_token_with_repo_read
    - CALLBACK_HMAC_SECRET=your_random_long_secret
    - RESULT_UPLOAD_TOKEN=your_random_long_secret
    # Backward-compatible names also work:
