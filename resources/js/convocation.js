@@ -625,9 +625,13 @@ document.addEventListener('DOMContentLoaded', () => {
       uploadBtn.disabled = false
       if (msg) {
         const errMsg = (err && err.message) ? String(err.message) : 'Unknown error'
-        const networkMsg = (navigator.onLine === false || errMsg.includes('Failed to fetch'))
-          ? 'Upload failed: network connection interrupted. Please reconnect and retry.'
-          : `Upload failed: ${errMsg}`
+        const failedToFetch = navigator.onLine === false || errMsg.includes('Failed to fetch')
+        const likelyTransportTimeout = failedToFetch && fileMb >= 8
+        const networkMsg = likelyTransportTimeout
+          ? 'Upload connection dropped (likely HTTP2/proxy timeout for larger files). Try splitting pages (e.g., 1-10, 11-20), use stable internet, or ask admin to raise server timeouts (Nginx/Apache/PHP/LiteSpeed).'
+          : failedToFetch
+            ? 'Upload failed: network connection interrupted. Please reconnect and retry.'
+            : `Upload failed: ${errMsg}`
         msg.textContent = networkMsg
         msg.className = 'mt-3 text-sm text-red-600'
       }
