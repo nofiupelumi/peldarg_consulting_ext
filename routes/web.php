@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DocumentController;
 use App\Models\AppSetting;
 use App\Models\CreditInvoice;
 use App\Models\Document;
@@ -17,6 +18,9 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
+    // Fallback upload endpoint for hosts/WAFs that block multipart requests under /api/*.
+    Route::post('/upload', [DocumentController::class, 'upload'])->name('upload.web');
+
     Route::get('/dashboard', function () {
         $user = User::findOrFail((int) session('user_id'));
         $settings = AppSetting::current();

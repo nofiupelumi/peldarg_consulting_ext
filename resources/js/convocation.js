@@ -2,6 +2,7 @@ import { PDFDocument } from 'pdf-lib'
 
 const API = {
   upload: '/api/upload',
+  uploadFallback: '/upload',
   list: '/api/documents',
   delete: (id) => `/api/documents/${id}`,
   invoices: '/api/credit-invoices',
@@ -544,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }, 200)
 
-      const r = await fetch(API.upload, { 
+      let r = await fetch(API.upload, { 
         method:'POST', 
         headers: {
           'X-CSRF-TOKEN': csrfToken,
@@ -555,12 +556,30 @@ document.addEventListener('DOMContentLoaded', () => {
         body: fd 
       })
 
+      // Some hosting firewalls block multipart POST to /api/* with 403.
+      // Retry once on a web route guarded by the same auth middleware.
+      if (r.status === 403) {
+        r = await fetch(API.uploadFallback, {
+          method:'POST',
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'same-origin',
+          body: fd
+        })
+      }
+
       if (r.status === 413) {
         throw new Error('File is too large for server upload limit. Please reduce PDF size or increase server limits (Nginx client_max_body_size / PHP upload_max_filesize, post_max_size).')
       }
       if (r.status === 401) {
         handleUnauthorized()
         return
+      }
+      if (r.status === 403) {
+        throw new Error('Access denied (403). Your session may have expired or the server blocked this request. Please refresh and log in again.')
       }
       
       if (progressInterval) clearInterval(progressInterval)
