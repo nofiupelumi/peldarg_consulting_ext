@@ -741,7 +741,7 @@ function tdRecover(d){
     btn.disabled = true;
     try {
       const csrfToken = document.querySelector('input[name="_token"]')?.value;
-      const res = await fetch(`/documents/${d.id}/recover-artifact`, {
+      const res = await fetch(`/api/documents/${d.id}/recover-artifact`, {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
