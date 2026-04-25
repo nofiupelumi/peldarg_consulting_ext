@@ -608,7 +608,7 @@
         <span class="skill-chip"><i class="fa-solid fa-screwdriver-wrench"></i> Power Automate</span>
         <span class="skill-chip"><i class="fa-brands fa-microsoft"></i> SharePoint</span>
         <span class="skill-chip"><i class="fa-solid fa-chart-line"></i> Tableau</span>
-        <span class="skill-chip"><i class="fa-solid fa-r"></i> R</span>
+        <span class="skill-chip"><i class="fa-solid fa-flask"></i> R</span>
         <!-- duplicate for seamless loop -->
         <span class="skill-chip"><i class="fa-brands fa-python"></i> Python</span>
         <span class="skill-chip"><i class="fa-solid fa-brain"></i> Machine Learning</span>
@@ -624,7 +624,7 @@
         <span class="skill-chip"><i class="fa-solid fa-screwdriver-wrench"></i> Power Automate</span>
         <span class="skill-chip"><i class="fa-brands fa-microsoft"></i> SharePoint</span>
         <span class="skill-chip"><i class="fa-solid fa-chart-line"></i> Tableau</span>
-        <span class="skill-chip"><i class="fa-solid fa-r"></i> R</span>
+        <span class="skill-chip"><i class="fa-solid fa-flask"></i> R</span>
     </div>
 </div>
 
@@ -748,8 +748,8 @@
                     <span class="metric-key">Fatalities</span>
                 </div>
                 <div class="metric">
-                    <span class="metric-val">161%</span>
-                    <span class="metric-key">Incident Rise</span>
+                    <span class="metric-val">+161%</span>
+                    <span class="metric-key">Incidents '18–'24</span>
                 </div>
             </div>
             <ul class="card-highlights">
@@ -905,7 +905,7 @@
             </div>
             <h2 class="card-title">Miss Unity Nigeria — Pageant Web Platform</h2>
             <p class="card-desc">
-                End-to-end pageant management website for Miss Unity Nigeria (<code style="color:var(--gold)">missunity.com.ng</code>).
+                End-to-end pageant management website for Miss Unity Nigeria (client production project).
                 Features contestant registration, event management, public pages, and an admin panel —
                 fully deployed on cPanel shared hosting with a custom database and production optimisations.
             </p>
