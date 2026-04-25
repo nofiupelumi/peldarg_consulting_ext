@@ -1,0 +1,214 @@
+{
+  "data": [
+    {
+      "id": "R_kgDOOPz1aA",
+      "name": "ML-Web-deployment-nigeria-security-risk-index",
+      "createdAt": "2025-03-20T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/ML-Web-deployment-nigeria-security-risk-index",
+      "description": "Interactive ML dashboard analysing 25,945 security incidents (2018–2024) across all 36 Nigerian states — with risk scores, trend analysis, perpetrator tracking, and predictive 2026 forecasts.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "Python",
+          "iconifyClass": "logos-python"
+        },
+        {
+          "name": "Jupyter Notebook",
+          "iconifyClass": "logos-jupyter"
+        },
+        {
+          "name": "JavaScript",
+          "iconifyClass": "logos-javascript"
+        },
+        {
+          "name": "HTML5",
+          "iconifyClass": "logos-html-5"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOOIGkaQ",
+      "name": "AWS-CHATBOT",
+      "createdAt": "2025-03-13T16:04:53Z",
+      "url": "https://github.com/nofiupelumi/AWS-CHATBOT",
+      "description": "Serverless FAQ chatbot for Centria University — AWS Lambda + Groq LLM API + fuzzy FAQ matching + Gradio UI. Zero-server architecture; scales automatically, prioritises structured FAQ answers over LLM hallucination.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "Python",
+          "iconifyClass": "logos-python"
+        },
+        {
+          "name": "AWS",
+          "iconifyClass": "logos-aws"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOOQ3Rmg",
+      "name": "Hr_Dashboard_Automated_CV_Screening",
+      "createdAt": "2025-03-25T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/Hr_Dashboard_Automated_CV_Screening",
+      "description": "Full-stack HR recruitment platform — applicants submit CVs online; a GitHub Actions workflow scores each submission against role keywords and surfaces ranked candidates in the dashboard in real time.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "PHP",
+          "iconifyClass": "logos-php"
+        },
+        {
+          "name": "JavaScript",
+          "iconifyClass": "logos-javascript"
+        },
+        {
+          "name": "MySQL",
+          "iconifyClass": "logos-mysql"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOOQ3abc",
+      "name": "chatbot-groq-laravel",
+      "createdAt": "2025-03-28T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/chatbot-groq-laravel",
+      "description": "Production-grade conversational AI chatbot built end-to-end with Laravel and Groq's ultra-fast LLM inference API — sub-second responses, secure session handling, and a polished chat UI.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "PHP",
+          "iconifyClass": "logos-php"
+        },
+        {
+          "name": "JavaScript",
+          "iconifyClass": "logos-javascript"
+        },
+        {
+          "name": "CSS",
+          "iconifyClass": "logos-css-3"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDONirahw",
+      "name": "Miss-Unity-Nigeria-Website",
+      "createdAt": "2024-12-27T00:15:50Z",
+      "url": "https://github.com/nofiupelumi/Miss-Unity-Nigeria-Website",
+      "description": "End-to-end pageant management website for Miss Unity Nigeria — contestant registration, event management, admin panel, and public pages — fully deployed on cPanel shared hosting with custom MySQL database.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "PHP",
+          "iconifyClass": "logos-php"
+        },
+        {
+          "name": "JavaScript",
+          "iconifyClass": "logos-javascript"
+        },
+        {
+          "name": "CSS",
+          "iconifyClass": "logos-css-3"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOMO1Bdg",
+      "name": "Sharepoint-site-for-IT-Department",
+      "createdAt": "2024-06-27T10:05:30Z",
+      "url": "https://github.com/nofiupelumi/Sharepoint-site-for-IT-Department",
+      "description": "Enterprise SharePoint intranet for Risk Control Service IT Dept — Team Directory, Knowledge Base, Help Desk (Forms integration), and a multi-step Power Automate approval workflow (Accountant → Director → Finance).",
+      "isFork": false,
+      "languages": []
+    },
+    {
+      "id": "R_kgDODisney01",
+      "name": "Disney-Analytics-Project",
+      "createdAt": "2024-09-15T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/Disney-Analytics-Project",
+      "description": "Boston University AD654 marketing analytics capstone — Tableau dashboard (4–6 visualisations on Disney movie trends), EDA in Python, and k-means / hierarchical clustering for family audience segmentation with targeting strategies.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "Python",
+          "iconifyClass": "logos-python"
+        },
+        {
+          "name": "Jupyter Notebook",
+          "iconifyClass": "logos-jupyter"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOAttend01",
+      "name": "Daily-attendance-bot-portal4security",
+      "createdAt": "2024-08-10T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/Daily-attendance-bot-portal4security",
+      "description": "Web-based attendance automation portal for a security organisation — employees check in/out via the portal; a Node.js bot enforces roster rules, flags anomalies, and generates daily summary reports.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "JavaScript",
+          "iconifyClass": "logos-javascript"
+        },
+        {
+          "name": "HTML5",
+          "iconifyClass": "logos-html-5"
+        },
+        {
+          "name": "CSS",
+          "iconifyClass": "logos-css-3"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOSSL0001",
+      "name": "sslcert_expiration_notifier",
+      "createdAt": "2024-10-05T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/sslcert_expiration_notifier",
+      "description": "Python monitoring tool that probes domain certificates, calculates days-to-expiry, writes status to a SharePoint-connected Excel sheet, and fires configurable alert emails — preventing surprise SSL outages.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "Python",
+          "iconifyClass": "logos-python"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOScrap001",
+      "name": "Multiple-Webscraper-Automation",
+      "createdAt": "2024-07-20T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/Multiple-Webscraper-Automation",
+      "description": "Automated intelligence pipeline — concurrently scrapes multiple Nigerian and international news portals (EONS Intelligence, Ripples Nigeria, etc.), deduplicates headlines, and dispatches formatted email digests on a schedule.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "Python",
+          "iconifyClass": "logos-python"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOGoog001",
+      "name": "Google-Data-Analytics-Capstone-Project",
+      "createdAt": "2024-02-18T00:00:00Z",
+      "url": "https://github.com/nofiupelumi/Google-Data-Analytics-Capstone-Project",
+      "description": "Google Professional Certificate capstone — full data lifecycle analysis of Cyclistic bike-share (Chicago): 12-month trip data cleaned in R, ggplot2 visualisations of rider behaviour, and three data-backed marketing recommendations.",
+      "isFork": false,
+      "languages": [
+        {
+          "name": "R",
+          "iconifyClass": "logos-r-lang"
+        }
+      ]
+    },
+    {
+      "id": "R_kgDOMDE2CA",
+      "name": "Power-BI-Capstone-Project",
+      "createdAt": "2024-05-31T09:06:19Z",
+      "url": "https://github.com/nofiupelumi/Power-BI-Capstone-Project",
+      "description": "FCB Dubizzle Company — interactive Power BI dashboard for used-car sales analytics, tracking revenue trends, inventory turnover, and regional performance across multiple dealerships.",
+      "isFork": false,
+      "languages": []
+    }
+  ]
+}
