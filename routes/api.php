@@ -11,6 +11,8 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\GithubController;
 use App\Http\Controllers\BookletLogController;
 use App\Http\Controllers\PartnerCapabilityController;
+use App\Http\Controllers\PartnerExtractionController;
+use App\Http\Controllers\PaystackPaymentController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserCreditController;
@@ -31,6 +33,8 @@ Route::middleware(['web', 'App\Http\Middleware\CheckAuth'])->group(function () {
 
     Route::get('/credit-invoices', [CreditInvoiceController::class, 'index']);
     Route::post('/credit-invoices', [CreditInvoiceController::class, 'store']);
+    Route::post('/credit-invoices/paystack/initialize', [PaystackPaymentController::class, 'initialize']);
+    Route::post('/credit-invoices/paystack/verify', [PaystackPaymentController::class, 'verify']);
 
     Route::post('/account/profile', [UserAccountController::class, 'profile']);
     Route::post('/account/password', [UserAccountController::class, 'password']);
@@ -70,3 +74,5 @@ Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->
 
 // Partner integration endpoint (machine-to-machine): defines billing authority boundaries.
 Route::get('/partner/capabilities', [PartnerCapabilityController::class, 'show']);
+Route::post('/partner/authorize-extraction', [PartnerExtractionController::class, 'authorizeExtraction']);
+Route::post('/partner/finalize-extraction', [PartnerExtractionController::class, 'finalizeExtraction']);

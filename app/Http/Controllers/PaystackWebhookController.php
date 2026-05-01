@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PaystackPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class PaystackWebhookController extends Controller
 {
+    public function __construct(private PaystackPaymentService $paystack)
+    {
+    }
+
     public function handle(Request $request)
     {
         $secret = (string) config('services.paystack.webhook_secret');
@@ -31,6 +36,15 @@ class PaystackWebhookController extends Controller
             'reference' => $event['data']['reference'] ?? null,
             'status' => $event['data']['status'] ?? null,
         ]);
+
+        try {
+            $this->paystack->fulfillFromWebhookEvent($event);
+        } catch (\Throwable $e) {
+            Log::warning('paystack webhook processing failed', [
+                'message' => $e->getMessage(),
+                'reference' => $event['data']['reference'] ?? null,
+            ]);
+        }
 
         return response()->json(['ok' => true], 200);
     }
