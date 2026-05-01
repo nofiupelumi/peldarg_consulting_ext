@@ -48,6 +48,22 @@ return [
         'token' => env('RESULT_UPLOAD_TOKEN', env('EXTRACTOR_BEARER_TOKEN')),
     ],
 
+    'paystack' => [
+        'public_key' => env('PAYSTACK_PUBLIC_KEY'),
+        'secret_key' => env('PAYSTACK_SECRET_KEY'),
+        'webhook_secret' => env('PAYSTACK_WEBHOOK_SECRET'),
+        'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
+        'callback_url' => env('PAYSTACK_CALLBACK_URL'),
+        'webhook_url' => env('PAYSTACK_WEBHOOK_URL'),
+    ],
+
+    'partner' => [
+        'token' => env('PARTNER_SHARED_TOKEN'),
+        'authority_domain' => env('BILLING_AUTHORITY_DOMAIN', 'https://extract.peldargconsulting.com'),
+        'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('PARTNER_ALLOWED_ORIGINS', 'https://extraction.riskcontrolnigeria.com'))))),
+        'centralized_billing_enabled' => (bool) env('CENTRALIZED_BILLING_ENABLED', true),
+    ],
+
     'contact_notify_to' => env('CONTACT_NOTIFY_TO'),
 
 ];

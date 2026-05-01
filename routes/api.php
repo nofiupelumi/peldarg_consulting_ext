@@ -10,6 +10,8 @@ use App\Http\Controllers\CreditInvoiceController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\GithubController;
 use App\Http\Controllers\BookletLogController;
+use App\Http\Controllers\PartnerCapabilityController;
+use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserCreditController;
 use App\Http\Controllers\UserAccountController;
@@ -64,3 +66,7 @@ Route::get('/download-output/{doc}/{type}', [DocumentController::class, 'downloa
 
 Route::post('/github/callback', [GithubController::class, 'callback'])->name('github.callback');
 Route::post('/github/upload-results', [GithubController::class, 'uploadResults'])->name('github.uploadResults');
+Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
+
+// Partner integration endpoint (machine-to-machine): defines billing authority boundaries.
+Route::get('/partner/capabilities', [PartnerCapabilityController::class, 'show']);
