@@ -8,6 +8,9 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ACTIVITY_EVENTS_URL: ${{ github.event.client_payload.activity_events_url || 'https://extract.peldargconsulting.com/api/partner/activity-events' }}
+  ACTIVITY_EVENTS_PATH: /api/partner/activity-events
+  PARTNER_NAME: ${{ github.event.client_payload.partner_name || 'riskcontrol' }}
 
 jobs:
   plan:
@@ -16,6 +19,60 @@ jobs:
     outputs:
       matrix: ${{ steps.make.outputs.matrix }}
     steps:
+      - name: Emit workflow dispatched event (safe-failure)
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          emit_activity() {
+            local event_key="$1"; shift
+            local sequence="$1"; shift
+            local status="$1"; shift
+            local phase="$1"; shift
+            local timestamp nonce payload signature idem_key
+            timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            nonce="$(python - <<'PY'
+            import uuid
+            print(uuid.uuid4())
+            PY
+            )"
+            idem_key="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${event_key}-${sequence}"
+            payload=$(cat <<JSON
+            {"partner_request_id":"${REQUEST_ID}","event_key":"${event_key}","sequence":${sequence},"status":"${status}","phase":"${phase}","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"event_at":"${timestamp}"}
+            JSON
+            )
+
+            if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+              signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+              signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+            else
+              signature=""
+            fi
+
+            curl -sS -o /tmp/activity_emit.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+              --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+              -H "Content-Type: application/json" \
+              -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+              -H "X-Partner-Name: ${PARTNER_NAME}" \
+              -H "X-Partner-Timestamp: ${timestamp}" \
+              -H "X-Partner-Nonce: ${nonce}" \
+              -H "X-Signature-Algorithm: hmac-sha256" \
+              -H "Idempotency-Key: ${idem_key}" \
+              -H "X-Partner-Signature: ${signature}" \
+              -d "${payload}" >/tmp/activity_emit_code.txt || true
+
+            code="$(cat /tmp/activity_emit_code.txt 2>/dev/null || echo '000')"
+            echo "[activity] ${event_key} -> HTTP ${code}"
+          }
+
+          emit_activity "dispatched" 10 "processing" "processing"
+          emit_activity "plan_started" 20 "processing" "planning"
       - name: Checkout
         uses: actions/checkout@v5
       - name: Install pdfinfo
@@ -70,12 +127,89 @@ jobs:
           SINGLE_CHUNK: ${{ github.event.client_payload.single_chunk || 'true' }}
           PAGE_START: ${{ github.event.client_payload.page_start }}
           PAGE_END: ${{ github.event.client_payload.page_end }}
+      - name: Emit plan completed event (safe-failure)
+        if: ${{ success() }}
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          nonce="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          payload=$(cat <<JSON
+          {"partner_request_id":"${REQUEST_ID}","event_key":"plan_completed","sequence":30,"status":"processing","phase":"planning_completed","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"event_at":"${timestamp}"}
+          JSON
+          )
+          signature=""
+          if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+            signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+            signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+          fi
+          curl -sS -o /tmp/activity_emit_plan.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+            --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+            -H "Content-Type: application/json" \
+            -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+            -H "X-Partner-Name: ${PARTNER_NAME}" \
+            -H "X-Partner-Timestamp: ${timestamp}" \
+            -H "X-Partner-Nonce: ${nonce}" \
+            -H "X-Signature-Algorithm: hmac-sha256" \
+            -H "Idempotency-Key: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-plan_completed-30" \
+            -H "X-Partner-Signature: ${signature}" \
+            -d "${payload}" >/tmp/activity_emit_plan_code.txt || true
+          echo "[activity] plan_completed -> HTTP $(cat /tmp/activity_emit_plan_code.txt 2>/dev/null || echo '000')"
 
   extract:
     needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
+      - name: Emit extract started event (safe-failure)
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          nonce="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          payload=$(cat <<JSON
+          {"partner_request_id":"${REQUEST_ID}","event_key":"extract_started","sequence":40,"status":"processing","phase":"extracting","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"event_at":"${timestamp}"}
+          JSON
+          )
+          signature=""
+          if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+            signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+            signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+          fi
+          curl -sS -o /tmp/activity_emit_extract_start.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+            --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+            -H "Content-Type: application/json" \
+            -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+            -H "X-Partner-Name: ${PARTNER_NAME}" \
+            -H "X-Partner-Timestamp: ${timestamp}" \
+            -H "X-Partner-Nonce: ${nonce}" \
+            -H "X-Signature-Algorithm: hmac-sha256" \
+            -H "Idempotency-Key: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-extract_started-40" \
+            -H "X-Partner-Signature: ${signature}" \
+            -d "${payload}" >/tmp/activity_emit_extract_start_code.txt || true
+          echo "[activity] extract_started -> HTTP $(cat /tmp/activity_emit_extract_start_code.txt 2>/dev/null || echo '000')"
       - name: Checkout
         uses: actions/checkout@v5
       - name: Set up Python
@@ -165,12 +299,89 @@ jobs:
         with:
           name: chunks
           path: chunks/*
+      - name: Emit extract completed event (safe-failure)
+        if: ${{ success() }}
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          nonce="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          payload=$(cat <<JSON
+          {"partner_request_id":"${REQUEST_ID}","event_key":"extract_completed","sequence":50,"status":"processing","phase":"extract_completed","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"event_at":"${timestamp}"}
+          JSON
+          )
+          signature=""
+          if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+            signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+            signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+          fi
+          curl -sS -o /tmp/activity_emit_extract_done.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+            --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+            -H "Content-Type: application/json" \
+            -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+            -H "X-Partner-Name: ${PARTNER_NAME}" \
+            -H "X-Partner-Timestamp: ${timestamp}" \
+            -H "X-Partner-Nonce: ${nonce}" \
+            -H "X-Signature-Algorithm: hmac-sha256" \
+            -H "Idempotency-Key: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-extract_completed-50" \
+            -H "X-Partner-Signature: ${signature}" \
+            -d "${payload}" >/tmp/activity_emit_extract_done_code.txt || true
+          echo "[activity] extract_completed -> HTTP $(cat /tmp/activity_emit_extract_done_code.txt 2>/dev/null || echo '000')"
 
   aggregate:
     needs: [plan, extract]
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
+      - name: Emit aggregate started event (safe-failure)
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          nonce="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          payload=$(cat <<JSON
+          {"partner_request_id":"${REQUEST_ID}","event_key":"aggregate_started","sequence":60,"status":"processing","phase":"aggregating","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"event_at":"${timestamp}"}
+          JSON
+          )
+          signature=""
+          if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+            signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+            signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+          fi
+          curl -sS -o /tmp/activity_emit_agg_start.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+            --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+            -H "Content-Type: application/json" \
+            -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+            -H "X-Partner-Name: ${PARTNER_NAME}" \
+            -H "X-Partner-Timestamp: ${timestamp}" \
+            -H "X-Partner-Nonce: ${nonce}" \
+            -H "X-Signature-Algorithm: hmac-sha256" \
+            -H "Idempotency-Key: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-aggregate_started-60" \
+            -H "X-Partner-Signature: ${signature}" \
+            -d "${payload}" >/tmp/activity_emit_agg_start_code.txt || true
+          echo "[activity] aggregate_started -> HTTP $(cat /tmp/activity_emit_agg_start_code.txt 2>/dev/null || echo '000')"
       - name: Checkout
         uses: actions/checkout@v5
       - name: Set up Python
@@ -267,6 +478,55 @@ jobs:
           name: outputs
           path: outputs/*
           overwrite: true
+      - name: Emit aggregate completed + callback sent events (safe-failure)
+        if: ${{ success() }}
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          emit_activity() {
+            local event_key="$1"; shift
+            local sequence="$1"; shift
+            local status="$1"; shift
+            local phase="$1"; shift
+            local timestamp nonce payload signature
+            timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            nonce="$(python - <<'PY'
+            import uuid
+            print(uuid.uuid4())
+            PY
+            )"
+            payload=$(cat <<JSON
+            {"partner_request_id":"${REQUEST_ID}","event_key":"${event_key}","sequence":${sequence},"status":"${status}","phase":"${phase}","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"event_at":"${timestamp}"}
+            JSON
+            )
+            signature=""
+            if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+              signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+              signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+            fi
+            curl -sS -o /tmp/activity_emit_done.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+              --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+              -H "Content-Type: application/json" \
+              -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+              -H "X-Partner-Name: ${PARTNER_NAME}" \
+              -H "X-Partner-Timestamp: ${timestamp}" \
+              -H "X-Partner-Nonce: ${nonce}" \
+              -H "X-Signature-Algorithm: hmac-sha256" \
+              -H "Idempotency-Key: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${event_key}-${sequence}" \
+              -H "X-Partner-Signature: ${signature}" \
+              -d "${payload}" >/tmp/activity_emit_done_code.txt || true
+            echo "[activity] ${event_key} -> HTTP $(cat /tmp/activity_emit_done_code.txt 2>/dev/null || echo '000')"
+          }
+
+          emit_activity "aggregate_completed" 70 "processing" "aggregate_completed"
+          emit_activity "callback_sent" 80 "finalized" "completed"
 
   notify_failure:
     needs: [plan, extract, aggregate]
@@ -274,6 +534,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Emit failed lifecycle event (safe-failure)
+        env:
+          PARTNER_SHARED_TOKEN: ${{ secrets.PARTNER_SHARED_TOKEN }}
+          PARTNER_SIGNATURE_SECRET: ${{ secrets.PARTNER_SIGNATURE_SECRET }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          USER_EMAIL: ${{ github.event.client_payload.user_email }}
+          EXTRACTION_TYPE: ${{ github.event.client_payload.extraction_type || 'convocation' }}
+          PAGES_REQUESTED: ${{ github.event.client_payload.pages_requested || 0 }}
+        run: |
+          set +e
+          timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          nonce="$(python - <<'PY'
+          import uuid
+          print(uuid.uuid4())
+          PY
+          )"
+          payload=$(cat <<JSON
+          {"partner_request_id":"${REQUEST_ID}","event_key":"failed","sequence":90,"status":"failed","phase":"failed","partner_name":"${PARTNER_NAME}","user_email":"${USER_EMAIL}","extraction_type":"${EXTRACTION_TYPE}","doc_id":"${DOC_ID}","run_id":"${GITHUB_RUN_ID}","pages_requested":${PAGES_REQUESTED},"failed_reason":"workflow_failed","event_at":"${timestamp}"}
+          JSON
+          )
+          signature=""
+          if [ -n "${PARTNER_SIGNATURE_SECRET:-}" ]; then
+            signing_string=$(printf "POST\n%s\n%s\n%s\n%s" "${ACTIVITY_EVENTS_PATH}" "${timestamp}" "${nonce}" "${payload}")
+            signature=$(printf '%s' "$signing_string" | openssl dgst -sha256 -hmac "${PARTNER_SIGNATURE_SECRET}" | awk '{print $2}')
+          fi
+          curl -sS -o /tmp/activity_emit_fail.txt -w "%{http_code}" -X POST "${ACTIVITY_EVENTS_URL}" \
+            --retry 2 --retry-delay 2 --retry-all-errors --connect-timeout 5 --max-time 20 \
+            -H "Content-Type: application/json" \
+            -H "X-Partner-Token: ${PARTNER_SHARED_TOKEN}" \
+            -H "X-Partner-Name: ${PARTNER_NAME}" \
+            -H "X-Partner-Timestamp: ${timestamp}" \
+            -H "X-Partner-Nonce: ${nonce}" \
+            -H "X-Signature-Algorithm: hmac-sha256" \
+            -H "Idempotency-Key: ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-failed-90" \
+            -H "X-Partner-Signature: ${signature}" \
+            -d "${payload}" >/tmp/activity_emit_fail_code.txt || true
+          echo "[activity] failed -> HTTP $(cat /tmp/activity_emit_fail_code.txt 2>/dev/null || echo '000')"
       - name: Send failed callback to app
         env:
           CALLBACK_URL: ${{ github.event.client_payload.callback_url || 'https://extraction.peldargconsulting.com/api/github/callback' }}
