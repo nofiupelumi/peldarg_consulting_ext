@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-Bcl9UUk4.css",
+    "file": "assets/app-DV0c2B8_.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "names": [
@@ -8,7 +8,7 @@
     ]
   },
   "resources/js/admin.js": {
-    "file": "assets/admin-CSxoqMdV.js",
+    "file": "assets/admin-BNkP_DbD.js",
     "name": "admin",
     "src": "resources/js/admin.js",
     "isEntry": true
@@ -26,7 +26,7 @@
     "isEntry": true
   },
   "resources/js/convocation.js": {
-    "file": "assets/convocation-7MffM39y.js",
+    "file": "assets/convocation-CZQC3QCE.js",
     "name": "convocation",
     "src": "resources/js/convocation.js",
     "isEntry": true

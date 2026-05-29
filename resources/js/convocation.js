@@ -6,6 +6,8 @@ const API = {
   list: '/api/documents',
   delete: (id) => `/api/documents/${id}`,
   invoices: '/api/credit-invoices',
+  paystackInitialize: '/api/credit-invoices/paystack/initialize',
+  paystackVerify: '/api/credit-invoices/paystack/verify',
   ledger: '/api/credit-ledger',
   summary: '/api/credit-summary',
 }
@@ -334,6 +336,90 @@ async function submitTopUp(form){
   }
 }
 
+async function initializePaystackTopUp(){
+  const requestedCreditsNode = document.getElementById('requested_credits')
+  const msg = document.getElementById('topUpMsg')
+  const btn = document.getElementById('paystackBtn')
+  const token = csrfToken()
+  const requestedCredits = parseInt(String(requestedCreditsNode?.value || '0'), 10)
+
+  if (!token) {
+    if (msg) { msg.textContent = 'Security token missing. Please refresh the page.'; msg.className = 'mt-2 text-sm text-red-600' }
+    return
+  }
+  if (!Number.isFinite(requestedCredits) || requestedCredits < 1) {
+    if (msg) { msg.textContent = 'Enter the number of credits you want to buy first.'; msg.className = 'mt-2 text-sm text-red-600' }
+    return
+  }
+
+  try {
+    btn && (btn.disabled = true)
+    if (msg) { msg.textContent = 'Starting Paystack checkout...'; msg.className = 'mt-2 text-sm text-gray-600' }
+
+    const r = await fetch(API.paystackInitialize, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRF-TOKEN': token,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ requested_credits: requestedCredits }),
+    })
+
+    const data = await r.json()
+    if (!r.ok) throw new Error(extractApiErrorMessage(data, 'Unable to initialize Paystack payment'))
+    if (!data?.authorization_url) throw new Error('Paystack did not return an authorization URL')
+
+    window.location.href = data.authorization_url
+  } catch (e) {
+    if (msg) { msg.textContent = e?.message || 'Unable to initialize Paystack payment'; msg.className = 'mt-2 text-sm text-red-600' }
+    btn && (btn.disabled = false)
+  }
+}
+
+async function verifyPaystackReference(reference){
+  const msg = document.getElementById('topUpMsg')
+  const token = csrfToken()
+  if (!reference || !token) return
+
+  try {
+    if (msg) { msg.textContent = 'Verifying Paystack payment...'; msg.className = 'mt-2 text-sm text-gray-600' }
+
+    const r = await fetch(API.paystackVerify, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRF-TOKEN': token,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ reference }),
+    })
+
+    const data = await r.json()
+    if (!r.ok) throw new Error(extractApiErrorMessage(data, 'Unable to verify Paystack payment'))
+
+    if (msg) {
+      const reusedText = data?.already_fulfilled ? ' Payment was already applied earlier.' : ''
+      msg.textContent = `Payment verified successfully.${reusedText}`
+      msg.className = 'mt-2 text-sm text-green-700'
+    }
+
+    await loadInvoices()
+    await loadLedger()
+    await loadCreditSummary()
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('reference')
+    window.history.replaceState({}, document.title, url.toString())
+  } catch (e) {
+    if (msg) { msg.textContent = e?.message || 'Unable to verify Paystack payment'; msg.className = 'mt-2 text-sm text-red-600' }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Adaptive polling (auto-refresh) for documents list
 // ---------------------------------------------------------------------------
@@ -414,12 +500,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const topUpForm = document.getElementById('topUpForm')
   const requestedCredits = document.getElementById('requested_credits')
+  const paystackBtn = document.getElementById('paystackBtn')
   if (requestedCredits) requestedCredits.addEventListener('input', () => computeTopUpEstimate())
   computeTopUpEstimate()
   if (topUpForm) topUpForm.addEventListener('submit', async (e) => {
     e.preventDefault()
     await submitTopUp(e.currentTarget)
   })
+  if (paystackBtn) paystackBtn.addEventListener('click', async () => {
+    await initializePaystackTopUp()
+  })
+
+  const paystackRef = new URLSearchParams(window.location.search).get('reference')
+  if (paystackRef) {
+    verifyPaystackReference(paystackRef)
+  }
 
   if (!hasUploadForm) return
 

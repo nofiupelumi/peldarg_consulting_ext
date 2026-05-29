@@ -267,3 +267,63 @@ jobs:
           name: outputs
           path: outputs/*
           overwrite: true
+
+  notify_failure:
+    needs: [plan, extract, aggregate]
+    if: ${{ always() && (needs.plan.result == 'failure' || needs.extract.result == 'failure' || needs.aggregate.result == 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Send failed callback to app
+        env:
+          CALLBACK_URL: ${{ github.event.client_payload.callback_url || 'https://extraction.peldargconsulting.com/api/github/callback' }}
+          CALLBACK_HMAC_SECRET: ${{ secrets.CALLBACK_HMAC_SECRET }}
+          CALLBACK_TOKEN: ${{ secrets.RESULT_UPLOAD_TOKEN }}
+          DOC_ID: ${{ github.event.client_payload.doc_id }}
+          REQUEST_ID: ${{ github.event.client_payload.request_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CALLBACK_URL:-}" ]; then
+            echo "[notify_failure] CALLBACK_URL missing; skipping"
+            exit 0
+          fi
+
+          reason="Workflow failed before successful aggregation/upload callback"
+          payload=$(cat <<JSON
+          {
+            "status": "failed",
+            "doc_id": "${DOC_ID}",
+            "request_id": "${REQUEST_ID}",
+            "failed_reason": "${reason}",
+            "pages_processed": 0,
+            "pages_with_results": 0,
+            "files": {}
+          }
+          JSON
+          )
+
+          sig=""
+          if [ -n "${CALLBACK_HMAC_SECRET:-}" ]; then
+            sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$CALLBACK_HMAC_SECRET" | awk '{print $2}')
+          fi
+
+          auth_headers=()
+          if [ -n "${CALLBACK_TOKEN:-}" ]; then
+            auth_headers+=( -H "Authorization: Bearer ${CALLBACK_TOKEN}" )
+            auth_headers+=( -H "X-Extractor-Token: ${CALLBACK_TOKEN}" )
+          fi
+
+          sig_headers=()
+          if [ -n "$sig" ]; then
+            sig_headers+=( -H "X-Extractor-Signature: ${sig}" )
+          fi
+
+          code=$(curl -sS -o /tmp/fail_callback_response.txt -w "%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            "${auth_headers[@]}" \
+            "${sig_headers[@]}" \
+            -d "$payload" \
+            "$CALLBACK_URL" || true)
+
+          echo "[notify_failure] callback HTTP ${code}"
+          cat /tmp/fail_callback_response.txt || true

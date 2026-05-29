@@ -14,14 +14,17 @@ const API = {
   documents: '/api/documents',
   deleteDocument: (id) => `/api/documents/${id}`,
 
+  paymentHistory: (params = '') => `/api/admin/payment-history${params ? `?${params}` : ''}`,
   ledger: '/api/admin/ledger',
   audit: '/api/admin/audit',
+  activityStreams: (params = '') => `/api/admin/activity-streams${params ? `?${params}` : ''}`,
+  reconciliation: (params = '') => `/api/admin/reconciliation${params ? `?${params}` : ''}`,
 
   settingsGet: '/api/admin/settings',
   settingsUpdate: '/api/admin/settings',
 }
 
-const API_TIERS = ['paid_1', 'paid_2', 'paid_3']
+const API_TIERS = ['paid_1']
 
 function $(sel) { return document.querySelector(sel) }
 function el(tag, attrs = {}) { const e = document.createElement(tag); Object.assign(e, attrs); return e }
@@ -463,6 +466,86 @@ async function loadDocs() {
 }
 
 // ---------------------------------------------------------------------------
+// Payment history
+// ---------------------------------------------------------------------------
+function paymentSummaryText(summary) {
+  return `${summary?.invoice_count ?? 0} payments | ${summary?.requested_credits ?? 0} credits | $${summary?.requested_amount_usd ?? '0.00'}`
+}
+
+function renderPaymentItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<span class="text-xs text-gray-500">No payments for this period.</span>'
+  }
+
+  return items.slice(0, 5).map((item) => {
+    const reference = item.payment_reference || item.gateway_reference || '—'
+    return `<div class="mb-2"><div class="font-medium">${item.invoice_number}</div><div class="text-xs text-gray-600">${reference} | ${item.requested_credits} credits | $${item.requested_amount_usd} | ${fmtDate(item.payment_at || item.fulfilled_at || item.paid_at || item.created_at)}</div></div>`
+  }).join('')
+}
+
+function renderPaymentHistory(payload) {
+  const tbody = $('#paymentHistoryTable tbody')
+  const select = $('#paymentHistoryUser')
+  const msg = $('#paymentHistoryMsg')
+  if (!tbody) return
+  tbody.innerHTML = ''
+
+  const users = Array.isArray(payload?.users) ? payload.users : []
+
+  if (select) {
+    const selected = select.value
+    select.innerHTML = '<option value="">All recent users</option>'
+    for (const entry of users) {
+      const option = el('option', { value: String(entry.user_id), textContent: `${entry.user_name} (${entry.user_email})` })
+      if (selected === String(entry.user_id)) option.selected = true
+      select.appendChild(option)
+    }
+  }
+
+  if (users.length === 0) {
+    const tr = document.createElement('tr')
+    tr.appendChild(tdHtml('<span class="text-sm text-gray-500">No payment history found.</span>'))
+    tr.firstChild.colSpan = 5
+    tbody.appendChild(tr)
+    setMsg(msg, 'No payment history found for the selected filters.')
+    return
+  }
+
+  for (const entry of users) {
+    const history = entry.payment_history || {}
+    const tr = document.createElement('tr')
+    tr.append(
+      tdHtml(`<div class="font-medium">${entry.user_name}</div><div class="text-xs text-gray-600">${entry.user_email}</div>`),
+      td(paymentSummaryText(history.summary?.selected_period)),
+      td(paymentSummaryText(history.summary?.current_month)),
+      td(paymentSummaryText(history.summary?.current_year)),
+      tdHtml(renderPaymentItems(history.items)),
+    )
+    tbody.appendChild(tr)
+  }
+
+  setMsg(msg, `${users.length} user payment history record(s) loaded.`, 'text-amber-700')
+}
+
+async function loadPaymentHistory() {
+  const params = new URLSearchParams()
+  const userId = $('#paymentHistoryUser')?.value || ''
+  const year = $('#paymentHistoryYear')?.value || ''
+  const month = $('#paymentHistoryMonth')?.value || ''
+  if (userId) params.set('user_id', userId)
+  if (year) params.set('year', year)
+  if (month) params.set('month', month)
+
+  try {
+    const payload = await apiFetch(API.paymentHistory(params.toString()))
+    renderPaymentHistory(payload)
+  } catch (e) {
+    console.error(e)
+    setMsg($('#paymentHistoryMsg'), e.message || 'Failed to load payment history', 'text-red-600')
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Ledger
 // ---------------------------------------------------------------------------
 function renderLedger(list) {
@@ -479,7 +562,10 @@ function renderLedger(list) {
       td(l.credits),
       td(l.balance_before),
       td(l.balance_after),
-      td(l.document_id ?? ''),
+      td(l.partner_request_id || ''),
+      td(l.partner_domain || ''),
+      td(l.partner_user_id || ''),
+      td(`res ${l.reserved_credits || 0} / cons ${l.consumed_credits || 0} / ref ${l.refunded_credits || 0}`),
       td(fmtDate(l.created_at)),
     )
     tbody.appendChild(tr)
@@ -512,6 +598,10 @@ function renderAudit(list) {
       td(a.actor_company_name || a.actor_name || a.actor_user_id || ''),
       td(a.target_company_name || a.target_name || a.target_user_id || ''),
       td(entity),
+      td(a.partner_request_id || ''),
+      td(a.partner_domain || ''),
+      td(a.partner_user_id || ''),
+      td(`res ${a.reserved_credits || 0} / cons ${a.consumed_credits || 0} / ref ${a.refunded_credits || 0}`),
       td(fmtDate(a.created_at)),
     )
     tbody.appendChild(tr)
@@ -528,6 +618,112 @@ async function loadAudit() {
 }
 
 // ---------------------------------------------------------------------------
+// Activity streams
+// ---------------------------------------------------------------------------
+function renderActivityStreams(payload) {
+  const tbody = $('#activityStreamsTable tbody')
+  if (!tbody) return
+  tbody.innerHTML = ''
+
+  const list = Array.isArray(payload?.streams) ? payload.streams : []
+  if ($('#activitySummary')) {
+    const pg = payload?.pagination || {}
+    $('#activitySummary').textContent = `${pg.total ?? list.length} stream(s) | page ${pg.current_page ?? 1}/${pg.last_page ?? 1}`
+  }
+
+  for (const row of list) {
+    const events = Array.isArray(row.events) ? row.events : []
+    const timeline = events.length
+      ? events.map((ev) => `#${ev.sequence} ${ev.event_key} (${ev.status || 'n/a'})`).join(' | ')
+      : '—'
+
+    const tr = document.createElement('tr')
+    tr.append(
+      td(row.partner_request_id || ''),
+      td(row.partner_name || ''),
+      td(row.user_email || ''),
+      td(row.extraction_type || ''),
+      td(`${row.status || ''} / ${row.phase || ''}`),
+      td(`${row.pages_processed || 0}/${row.pages_requested || 0}`),
+      td(`res ${row.credits_reserved || 0} / cons ${row.credits_consumed || 0} / ref ${row.credits_refunded || 0}`),
+      td(`${row.last_event_key || '—'} @ ${fmtDate(row.last_event_at)}`),
+      td(timeline),
+    )
+    tbody.appendChild(tr)
+  }
+}
+
+async function loadActivityStreams() {
+  const params = new URLSearchParams()
+  const dateFrom = $('#activity_date_from')?.value || ''
+  const dateTo = $('#activity_date_to')?.value || ''
+  const partner = $('#activity_partner')?.value?.trim() || ''
+  const user = $('#activity_user')?.value?.trim() || ''
+  const extractionType = $('#activity_extraction_type')?.value || ''
+  const status = $('#activity_status')?.value || ''
+  const creditOutcome = $('#activity_credit_outcome')?.value || ''
+  const requestId = $('#activity_partner_request_id')?.value?.trim() || ''
+
+  if (dateFrom) params.set('date_from', dateFrom)
+  if (dateTo) params.set('date_to', dateTo)
+  if (partner) params.set('partner', partner)
+  if (user) params.set('user', user)
+  if (extractionType) params.set('extraction_type', extractionType)
+  if (status) params.set('status', status)
+  if (creditOutcome) params.set('credit_outcome', creditOutcome)
+  if (requestId) params.set('partner_request_id', requestId)
+
+  try {
+    const payload = await apiFetch(API.activityStreams(params.toString()))
+    renderActivityStreams(payload)
+  } catch (e) {
+    console.error(e)
+    if ($('#activitySummary')) $('#activitySummary').textContent = e.message || 'Failed to load activity streams'
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reconciliation
+// ---------------------------------------------------------------------------
+function renderReconciliation(data) {
+  if (!data) return
+
+  const peldarg = data.peldarg || {}
+  const partner = data.partner || {}
+  const variance = data.variance || {}
+
+  if ($('#reconRange')) $('#reconRange').textContent = `${data.date_from || '—'} to ${data.date_to || '—'}`
+  if ($('#reconPeldargProcessed')) $('#reconPeldargProcessed').textContent = String(peldarg.pages_processed_total ?? 0)
+  if ($('#reconPartnerProcessed')) $('#reconPartnerProcessed').textContent = String(partner.processed_pages_total ?? 0)
+  if ($('#reconDelta')) $('#reconDelta').textContent = String(variance.processed_pages_delta ?? 0)
+  if ($('#reconConsumedDelta')) $('#reconConsumedDelta').textContent = String(variance.consumed_vs_processed_delta ?? 0)
+  if ($('#reconPeldargCredits')) {
+    $('#reconPeldargCredits').textContent = `Reserved ${peldarg.reserved_credits_total ?? 0} | Consumed ${peldarg.consumed_credits_total ?? 0} | Refunded ${peldarg.refunded_credits_total ?? 0}`
+  }
+  if ($('#reconPartnerBreakdown')) {
+    $('#reconPartnerBreakdown').textContent = partner.available === false
+      ? (partner.error || 'Partner reconciliation unavailable')
+      : `Booklet ${partner.booklet_pages_total ?? 0} | Certificate ${partner.certificate_pages_total ?? 0} | Docs ${partner.completed_documents_total ?? 0}`
+  }
+}
+
+async function loadReconciliation() {
+  const params = new URLSearchParams()
+  const dateFrom = $('#recon_date_from')?.value || ''
+  const dateTo = $('#recon_date_to')?.value || ''
+  if (dateFrom) params.set('date_from', dateFrom)
+  if (dateTo) params.set('date_to', dateTo)
+
+  try {
+    const data = await apiFetch(API.reconciliation(params.toString()))
+    renderReconciliation(data)
+  } catch (e) {
+    console.error(e)
+    if ($('#reconPartnerBreakdown')) $('#reconPartnerBreakdown').textContent = e.message || 'Failed to load reconciliation'
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
@@ -539,14 +735,29 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#invoiceStatus')?.addEventListener('change', () => loadInvoices())
 
   $('#refreshDocs')?.addEventListener('click', () => loadDocs())
+  $('#refreshPaymentHistory')?.addEventListener('click', () => loadPaymentHistory())
+  $('#paymentHistoryUser')?.addEventListener('change', () => loadPaymentHistory())
+  $('#paymentHistoryMonth')?.addEventListener('change', () => loadPaymentHistory())
+  $('#paymentHistoryYear')?.addEventListener('change', () => loadPaymentHistory())
   $('#refreshLedger')?.addEventListener('click', () => loadLedger())
   $('#refreshAudit')?.addEventListener('click', () => loadAudit())
+  $('#activityStreamForm')?.addEventListener('submit', (e) => { e.preventDefault(); loadActivityStreams() })
+  $('#refreshActivityStreams')?.addEventListener('click', () => loadActivityStreams())
+  $('#reconciliationForm')?.addEventListener('submit', (e) => { e.preventDefault(); loadReconciliation() })
+  $('#refreshReconciliation')?.addEventListener('click', () => loadReconciliation())
+
+  const now = new Date()
+  if ($('#paymentHistoryYear') && !$('#paymentHistoryYear').value) $('#paymentHistoryYear').value = String(now.getFullYear())
+  if ($('#paymentHistoryMonth') && !$('#paymentHistoryMonth').value) $('#paymentHistoryMonth').value = String(now.getMonth() + 1)
 
   // initial
   loadSettings()
   loadUsers()
   loadInvoices()
   loadDocs()
+  loadPaymentHistory()
   loadLedger()
   loadAudit()
+  loadActivityStreams()
+  loadReconciliation()
 })

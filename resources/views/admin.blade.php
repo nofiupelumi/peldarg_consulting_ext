@@ -82,8 +82,6 @@
             <input class="rounded-lg border border-gray-300 px-3 py-2" name="credit_balance" type="number" min="0" step="1" placeholder="Starting credits" />
             <select class="rounded-lg border border-gray-300 px-3 py-2" name="allowed_api_tiers" multiple size="3" title="Allowed API tiers">
                 <option value="paid_1" selected>PAID TIER 1</option>
-                <option value="paid_2">PAID TIER 2</option>
-                <option value="paid_3">PAID TIER 3</option>
             </select>
             <label class="inline-flex items-center gap-2 text-sm px-2">
                 <input type="checkbox" name="is_admin" value="1" />
@@ -176,6 +174,49 @@
 
     <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
         <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-xl font-semibold">Payment History</h2>
+            <div class="flex items-center gap-2 flex-wrap">
+                <select id="paymentHistoryUser" class="rounded-lg border border-gray-300 px-3 py-2 text-sm min-w-[220px]">
+                    <option value="">All recent users</option>
+                </select>
+                <input id="paymentHistoryYear" type="number" min="2000" max="2100" class="rounded-lg border border-gray-300 px-3 py-2 text-sm w-28" placeholder="Year" />
+                <select id="paymentHistoryMonth" class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    <option value="">All months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+                <button id="refreshPaymentHistory" class="text-sm px-3 py-2 rounded-lg border border-gray-300">Refresh</button>
+            </div>
+        </div>
+        <div id="paymentHistoryMsg" class="text-sm text-gray-600 mt-2"></div>
+        <div class="overflow-auto mt-4">
+            <table class="w-full text-sm border-collapse" id="paymentHistoryTable">
+                <thead>
+                <tr class="bg-gray-50">
+                    <th class="text-left p-2 border-b">User</th>
+                    <th class="text-left p-2 border-b">Selected Period</th>
+                    <th class="text-left p-2 border-b">Current Month</th>
+                    <th class="text-left p-2 border-b">Current Year</th>
+                    <th class="text-left p-2 border-b">Recent Payments</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
+        <div class="flex items-center justify-between flex-wrap gap-2">
             <h2 class="text-xl font-semibold">Credit Ledger</h2>
             <button id="refreshLedger" class="text-sm px-3 py-2 rounded-lg border border-gray-300">Refresh</button>
         </div>
@@ -190,7 +231,10 @@
                     <th class="text-left p-2 border-b">Credits</th>
                     <th class="text-left p-2 border-b">Before</th>
                     <th class="text-left p-2 border-b">After</th>
-                    <th class="text-left p-2 border-b">Doc</th>
+                    <th class="text-left p-2 border-b">Partner Request</th>
+                    <th class="text-left p-2 border-b">Partner Domain</th>
+                    <th class="text-left p-2 border-b">Partner User ID</th>
+                    <th class="text-left p-2 border-b">Partner Credits</th>
                     <th class="text-left p-2 border-b">Created</th>
                 </tr>
                 </thead>
@@ -214,7 +258,104 @@
                     <th class="text-left p-2 border-b">Actor</th>
                     <th class="text-left p-2 border-b">Target</th>
                     <th class="text-left p-2 border-b">Entity</th>
+                    <th class="text-left p-2 border-b">Partner Request</th>
+                    <th class="text-left p-2 border-b">Partner Domain</th>
+                    <th class="text-left p-2 border-b">Partner User ID</th>
+                    <th class="text-left p-2 border-b">Partner Credits</th>
                     <th class="text-left p-2 border-b">Created</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-xl font-semibold">Partner Reconciliation</h2>
+            <button id="refreshReconciliation" class="text-sm px-3 py-2 rounded-lg border border-gray-300">Refresh</button>
+        </div>
+
+        <form id="reconciliationForm" class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input id="recon_date_from" type="date" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <input id="recon_date_to" type="date" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <div class="md:col-span-2 flex items-center gap-3">
+                <button type="submit" class="px-4 py-2 rounded-lg font-semibold" style="background: var(--peldarg-primary-navy); color: var(--peldarg-off-white);">Run Reconciliation</button>
+                <span id="reconRange" class="text-sm text-gray-600"></span>
+            </div>
+        </form>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mt-4">
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div class="text-xs uppercase tracking-wide text-gray-500">Peldarg Processed Pages</div>
+                <div id="reconPeldargProcessed" class="mt-1 text-2xl font-semibold text-gray-900">0</div>
+                <div id="reconPeldargCredits" class="text-xs text-gray-500 mt-1">Reserved 0 | Consumed 0 | Refunded 0</div>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div class="text-xs uppercase tracking-wide text-gray-500">RiskControl Processed Pages</div>
+                <div id="reconPartnerProcessed" class="mt-1 text-2xl font-semibold text-gray-900">0</div>
+                <div id="reconPartnerBreakdown" class="text-xs text-gray-500 mt-1">Booklet 0 | Certificate 0 | Docs 0</div>
+            </div>
+            <div class="rounded-lg border border-lime-100 bg-lime-50 p-3">
+                <div class="text-xs uppercase tracking-wide text-gray-500">Processed Page Delta</div>
+                <div id="reconDelta" class="mt-1 text-2xl font-semibold text-[#0a2912]">0</div>
+            </div>
+            <div class="rounded-lg border border-amber-100 bg-amber-50 p-3">
+                <div class="text-xs uppercase tracking-wide text-gray-500">Consumed vs Processed Delta</div>
+                <div id="reconConsumedDelta" class="mt-1 text-2xl font-semibold text-amber-800">0</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm mb-6">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-xl font-semibold">Extraction Activity Streams</h2>
+            <button id="refreshActivityStreams" class="text-sm px-3 py-2 rounded-lg border border-gray-300">Refresh</button>
+        </div>
+
+        <form id="activityStreamForm" class="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+            <input id="activity_date_from" type="date" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <input id="activity_date_to" type="date" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <input id="activity_partner" type="text" placeholder="Partner" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <input id="activity_user" type="text" placeholder="User email/name" class="rounded-lg border border-gray-300 px-3 py-2" />
+            <select id="activity_extraction_type" class="rounded-lg border border-gray-300 px-3 py-2">
+                <option value="">All extraction types</option>
+                <option value="convocation">Convocation</option>
+                <option value="certificate">Certificate</option>
+            </select>
+            <select id="activity_status" class="rounded-lg border border-gray-300 px-3 py-2">
+                <option value="">All statuses</option>
+                <option value="processing">Processing</option>
+                <option value="authorized">Authorized</option>
+                <option value="finalized">Finalized</option>
+                <option value="failed">Failed</option>
+            </select>
+            <select id="activity_credit_outcome" class="rounded-lg border border-gray-300 px-3 py-2">
+                <option value="">All credit outcomes</option>
+                <option value="reserved">Reserved</option>
+                <option value="settled">Settled</option>
+                <option value="refunded">Refunded</option>
+            </select>
+            <input id="activity_partner_request_id" type="text" placeholder="Partner request ID" class="rounded-lg border border-gray-300 px-3 py-2 md:col-span-2" />
+            <div class="md:col-span-3 flex items-center gap-3">
+                <button type="submit" class="px-4 py-2 rounded-lg font-semibold" style="background: var(--peldarg-primary-navy); color: var(--peldarg-off-white);">Apply Filters</button>
+                <span id="activitySummary" class="text-sm text-gray-600">No activity loaded yet.</span>
+            </div>
+        </form>
+
+        <div class="overflow-auto mt-4">
+            <table class="w-full text-sm border-collapse" id="activityStreamsTable">
+                <thead>
+                <tr class="bg-gray-50">
+                    <th class="text-left p-2 border-b">Partner Request</th>
+                    <th class="text-left p-2 border-b">Partner</th>
+                    <th class="text-left p-2 border-b">User</th>
+                    <th class="text-left p-2 border-b">Type</th>
+                    <th class="text-left p-2 border-b">Status</th>
+                    <th class="text-left p-2 border-b">Pages</th>
+                    <th class="text-left p-2 border-b">Credits</th>
+                    <th class="text-left p-2 border-b">Last Event</th>
+                    <th class="text-left p-2 border-b">Timeline (Latest)</th>
                 </tr>
                 </thead>
                 <tbody></tbody>

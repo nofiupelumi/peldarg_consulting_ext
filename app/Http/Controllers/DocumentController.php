@@ -17,7 +17,8 @@ use Illuminate\Validation\ValidationException;
 
 class DocumentController extends Controller
 {
-    private const API_TIERS = ['paid_1', 'paid_2', 'paid_3'];
+    private const API_TIERS = ['paid_1'];
+    private const PROCESSING_TIMEOUT_HOURS = 9;
 
     public function __construct(private CreditService $creditService)
     {
@@ -34,7 +35,7 @@ class DocumentController extends Controller
             'session' => 'nullable|string',
             'start_page' => 'nullable|integer|min:1',
             'end_page' => 'nullable|integer|min:1|gte:start_page',
-            'api_tier' => 'required|string|in:paid_1,paid_2,paid_3',
+            'api_tier' => 'required|string|in:paid_1',
         ], [
             'file.required' => 'No PDF file was received. If your file is large, increase PHP upload_max_filesize and post_max_size on the server.',
             'file.mimes' => 'Only PDF files are allowed.',
@@ -295,6 +296,29 @@ class DocumentController extends Controller
 
     public function index()
     {
+        // Guardrail: if callback/upload never arrives, avoid perpetual "processing" state.
+        // Finalize stale requests as failed so reserved credits are released.
+        $staleProcessingDocs = Document::query()
+            ->where('status', 'processing')
+            ->where('created_at', '<', now()->subHours(self::PROCESSING_TIMEOUT_HOURS))
+            ->get();
+
+        foreach ($staleProcessingDocs as $staleDoc) {
+            if (!in_array((string) $staleDoc->credit_status, ['finalized', 'failed'], true)) {
+                $this->creditService->finalizeDocument(
+                    document: $staleDoc,
+                    pagesProcessed: 0,
+                    pagesWithResults: 0,
+                    status: 'failed',
+                    failedReason: 'Processing timed out before extractor callback.',
+                );
+            } else {
+                $staleDoc->status = 'failed';
+                $staleDoc->failed_reason = $staleDoc->failed_reason ?: 'Processing timed out before extractor callback.';
+                $staleDoc->save();
+            }
+        }
+
         $userId = (int) session('user_id');
         $isAdmin = (bool) session('is_admin');
 

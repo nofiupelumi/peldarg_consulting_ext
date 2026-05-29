@@ -4,6 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AdminAuditController;
 use App\Http\Controllers\AdminCreditController;
 use App\Http\Controllers\AdminLedgerController;
+use App\Http\Controllers\AdminActivityStreamController;
+use App\Http\Controllers\AdminPaymentHistoryController;
+use App\Http\Controllers\AdminReconciliationController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\CreditInvoiceController;
@@ -11,7 +14,10 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\GithubController;
 use App\Http\Controllers\BookletLogController;
 use App\Http\Controllers\PartnerCapabilityController;
+use App\Http\Controllers\PartnerActivityController;
 use App\Http\Controllers\PartnerExtractionController;
+use App\Http\Controllers\PartnerMigrationController;
+use App\Http\Controllers\PartnerTrackingController;
 use App\Http\Controllers\PaystackPaymentController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\SearchController;
@@ -46,6 +52,9 @@ Route::middleware(['web', 'App\Http\Middleware\CheckAuth', 'App\Http\Middleware\
 
     Route::get('/admin/ledger', [AdminLedgerController::class, 'index']);
     Route::get('/admin/audit', [AdminAuditController::class, 'index']);
+    Route::get('/admin/activity-streams', [AdminActivityStreamController::class, 'index']);
+    Route::get('/admin/payment-history', [AdminPaymentHistoryController::class, 'index']);
+    Route::get('/admin/reconciliation', [AdminReconciliationController::class, 'index']);
 
     Route::get('/admin/users', [AdminUserController::class, 'index']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
@@ -72,7 +81,25 @@ Route::post('/github/callback', [GithubController::class, 'callback'])->name('gi
 Route::post('/github/upload-results', [GithubController::class, 'uploadResults'])->name('github.uploadResults');
 Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
 
-// Partner integration endpoint (machine-to-machine): defines billing authority boundaries.
-Route::get('/partner/capabilities', [PartnerCapabilityController::class, 'show']);
-Route::post('/partner/authorize-extraction', [PartnerExtractionController::class, 'authorizeExtraction']);
-Route::post('/partner/finalize-extraction', [PartnerExtractionController::class, 'finalizeExtraction']);
+// Phase 6: Security hardening for partner endpoints (machine-to-machine)
+// Requires: X-Partner-Name, X-Partner-Signature, X-Partner-Timestamp, X-Partner-Nonce headers
+// Validates: HMAC signature, timestamp freshness, nonce uniqueness, IP allowlist, and idempotency
+Route::middleware([
+    'App\Http\Middleware\PartnerAllowlistVerification',
+    'App\Http\Middleware\PartnerSignatureVerification',
+    'App\Http\Middleware\IdempotencyKeyTracking',
+])->group(function () {
+    Route::get('/partner/capabilities', [PartnerCapabilityController::class, 'show']);
+    Route::post('/partner/credit-summary', [PartnerCapabilityController::class, 'creditSummary']);
+    Route::post('/partner/payment-history', [PartnerCapabilityController::class, 'paymentHistory']);
+    Route::post('/partner/activity-events', [PartnerActivityController::class, 'ingest']);
+    Route::post('/partner/extraction-progress', [PartnerTrackingController::class, 'progress']);
+    Route::post('/partner/authorize-extraction', [PartnerExtractionController::class, 'authorizeExtraction']);
+    Route::post('/partner/finalize-extraction', [PartnerExtractionController::class, 'finalizeExtraction']);
+    Route::post('/partner/paystack/initialize', [PartnerCapabilityController::class, 'paystackInitialize']);
+    Route::post('/partner/paystack/verify', [PartnerCapabilityController::class, 'paystackVerify']);
+});
+
+// Phase 7: User migration endpoint (admin operation, uses simple token auth in controller)
+Route::post('/partner/migrate-user', [PartnerMigrationController::class, 'migrateUser']);
+

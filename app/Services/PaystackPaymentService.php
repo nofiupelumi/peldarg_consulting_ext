@@ -15,6 +15,10 @@ class PaystackPaymentService
 {
     private const ACTIVE_GATEWAY_STATUSES = ['initializing', 'initialized', 'pending', 'processing', 'ongoing'];
 
+    public function __construct(private readonly PartnerCreditSyncService $partnerCreditSyncService)
+    {
+    }
+
     public function initializeForUser(User $user, int $requestedCredits): array
     {
         $settings = AppSetting::current();
@@ -146,7 +150,7 @@ class PaystackPaymentService
             throw ValidationException::withMessages(['reference' => 'Transaction reference is missing.']);
         }
 
-        return DB::transaction(function () use ($data, $reference, $expectedUserId) {
+        $result = DB::transaction(function () use ($data, $reference, $expectedUserId) {
             $invoice = CreditInvoice::query()
                 ->lockForUpdate()
                 ->where('gateway_reference', $reference)
@@ -226,8 +230,19 @@ class PaystackPaymentService
                 'handled' => true,
                 'already_fulfilled' => false,
                 'invoice' => $invoice,
+                'user' => $user,
                 'credit_balance' => $after,
             ];
         });
+
+        if (($result['handled'] ?? false) === true && ($result['already_fulfilled'] ?? false) === false && ($result['user'] ?? null) instanceof User) {
+            /** @var User $syncedUser */
+            $syncedUser = $result['user'];
+            $this->partnerCreditSyncService->notifyCreditUpdated($syncedUser, 'paystack_payment_verified', [
+                'reference' => $reference,
+            ]);
+        }
+
+        return $result;
     }
 }

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\CreditAuditLog;
 use App\Models\CreditLedger;
 use App\Models\PartnerExtractionAuthorization;
+use App\Services\ExtractionActivityService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +14,16 @@ use Illuminate\Validation\ValidationException;
 
 class PartnerExtractionController extends Controller
 {
-    private const API_TIERS = ['paid_1', 'paid_2', 'paid_3'];
+    public function __construct(private readonly ExtractionActivityService $activityService)
+    {
+    }
+
+    private const API_TIERS = ['paid_1'];
+
+    private function selectApprovedApiTier(array $allowedApiTiers, int $pagesRequested, string $extractionType): string
+    {
+        return $allowedApiTiers[0] ?? 'paid_1';
+    }
 
     private function assertPartnerToken(Request $request): void
     {
@@ -36,7 +47,7 @@ class PartnerExtractionController extends Controller
             'partner_name' => 'nullable|string|max:100',
             'partner_domain' => 'nullable|string|max:255',
             'partner_user_reference' => 'nullable|string|max:255',
-            'requested_api_tier' => 'nullable|string|in:paid_1,paid_2,paid_3',
+            'workload_metadata' => 'nullable|array',
         ]);
 
         $result = DB::transaction(function () use ($data) {
@@ -65,10 +76,11 @@ class PartnerExtractionController extends Controller
                 $allowedApiTiers = ['paid_1'];
             }
 
-            $requestedApiTier = strtolower(trim((string) ($data['requested_api_tier'] ?? '')));
-            $selectedApiTier = in_array($requestedApiTier, $allowedApiTiers, true)
-                ? $requestedApiTier
-                : $allowedApiTiers[0];
+            $selectedApiTier = $this->selectApprovedApiTier(
+                $allowedApiTiers,
+                (int) $data['pages_requested'],
+                strtolower((string) $data['extraction_type']),
+            );
 
             $requiredCredits = max(1, (int) $data['pages_requested']);
             $before = (int) $user->credit_balance;
@@ -93,7 +105,11 @@ class PartnerExtractionController extends Controller
                     'partner_request_id' => $data['partner_request_id'],
                     'partner_name' => $data['partner_name'] ?? null,
                     'partner_domain' => $data['partner_domain'] ?? null,
+                    'partner_user_id' => $data['partner_user_reference'] ?? null,
                     'extraction_type' => $data['extraction_type'],
+                    'reserved_credits' => $requiredCredits,
+                    'consumed_credits' => 0,
+                    'refunded_credits' => 0,
                 ],
                 'created_by_user_id' => $user->id,
             ]);
@@ -115,7 +131,26 @@ class PartnerExtractionController extends Controller
                 'expires_at' => now()->addDay(),
                 'meta' => [
                     'allowed_api_tiers' => $allowedApiTiers,
+                    'workload_metadata' => $data['workload_metadata'] ?? null,
                 ],
+            ]);
+
+            CreditAuditLog::create([
+                'actor_user_id' => $user->id,
+                'target_user_id' => $user->id,
+                'event_key' => 'partner.authorization.created',
+                'entity_type' => 'partner_extraction_authorization',
+                'entity_id' => $authorization->id,
+                'old_values' => null,
+                'new_values' => [
+                    'partner_domain' => $authorization->partner_domain,
+                    'partner_user_id' => $authorization->partner_user_reference,
+                    'partner_request_id' => $authorization->partner_request_id,
+                    'reserved_credits' => (int) $authorization->credits_reserved,
+                    'consumed_credits' => 0,
+                    'refunded_credits' => 0,
+                ],
+                'request_id' => $authorization->partner_request_id,
             ]);
 
             return ['authorization' => $authorization, 'credit_balance' => $after, 'reused' => false];
@@ -123,6 +158,13 @@ class PartnerExtractionController extends Controller
 
         /** @var PartnerExtractionAuthorization $authorization */
         $authorization = $result['authorization'];
+
+        if (!(bool) $result['reused']) {
+            $authorization->loadMissing('user:id,email');
+            $this->activityService->emitSystemEvent('authorized', $authorization, [
+                'credit_outcome' => 'reserved',
+            ]);
+        }
 
         return response()->json([
             'partner_request_id' => $authorization->partner_request_id,
@@ -179,7 +221,15 @@ class PartnerExtractionController extends Controller
                         'balance_after' => $after,
                         'unit_price_usd' => $rate,
                         'amount_usd' => $reserved * $rate,
-                        'meta' => ['source' => 'partner_finalize_failed', 'partner_request_id' => $authorization->partner_request_id],
+                        'meta' => [
+                            'source' => 'partner_finalize_failed',
+                            'partner_request_id' => $authorization->partner_request_id,
+                            'partner_domain' => $authorization->partner_domain,
+                            'partner_user_id' => $authorization->partner_user_reference,
+                            'reserved_credits' => (int) $authorization->credits_reserved,
+                            'consumed_credits' => 0,
+                            'refunded_credits' => $reserved,
+                        ],
                         'created_by_user_id' => $user->id,
                     ]);
                     $user->credit_balance = $after;
@@ -193,6 +243,25 @@ class PartnerExtractionController extends Controller
                 $authorization->failed_reason = $data['failed_reason'] ?? 'Processing failed';
                 $authorization->finalized_at = now();
                 $authorization->save();
+
+                CreditAuditLog::create([
+                    'actor_user_id' => $user->id,
+                    'target_user_id' => $user->id,
+                    'event_key' => 'partner.authorization.failed',
+                    'entity_type' => 'partner_extraction_authorization',
+                    'entity_id' => $authorization->id,
+                    'old_values' => ['status' => 'authorized'],
+                    'new_values' => [
+                        'partner_domain' => $authorization->partner_domain,
+                        'partner_user_id' => $authorization->partner_user_reference,
+                        'partner_request_id' => $authorization->partner_request_id,
+                        'reserved_credits' => (int) $authorization->credits_reserved,
+                        'consumed_credits' => 0,
+                        'refunded_credits' => (int) $authorization->credits_refunded,
+                        'status' => 'failed',
+                    ],
+                    'request_id' => $authorization->partner_request_id,
+                ]);
 
                 return ['authorization' => $authorization, 'credit_balance' => (int) $user->credit_balance, 'reused' => false];
             }
@@ -216,7 +285,15 @@ class PartnerExtractionController extends Controller
                     'balance_after' => $after,
                     'unit_price_usd' => $rate,
                     'amount_usd' => $extraNeeded * $rate,
-                    'meta' => ['source' => 'partner_finalize_extra', 'partner_request_id' => $authorization->partner_request_id],
+                    'meta' => [
+                        'source' => 'partner_finalize_extra',
+                        'partner_request_id' => $authorization->partner_request_id,
+                        'partner_domain' => $authorization->partner_domain,
+                        'partner_user_id' => $authorization->partner_user_reference,
+                        'reserved_credits' => (int) $authorization->credits_reserved,
+                        'consumed_credits' => $extraNeeded,
+                        'refunded_credits' => 0,
+                    ],
                     'created_by_user_id' => $user->id,
                 ]);
                 $user->credit_balance = $after;
@@ -236,7 +313,15 @@ class PartnerExtractionController extends Controller
                     'balance_after' => $after,
                     'unit_price_usd' => $rate,
                     'amount_usd' => $refund * $rate,
-                    'meta' => ['source' => 'partner_finalize_refund', 'partner_request_id' => $authorization->partner_request_id],
+                    'meta' => [
+                        'source' => 'partner_finalize_refund',
+                        'partner_request_id' => $authorization->partner_request_id,
+                        'partner_domain' => $authorization->partner_domain,
+                        'partner_user_id' => $authorization->partner_user_reference,
+                        'reserved_credits' => (int) $authorization->credits_reserved,
+                        'consumed_credits' => 0,
+                        'refunded_credits' => $refund,
+                    ],
                     'created_by_user_id' => $user->id,
                 ]);
                 $user->credit_balance = $after;
@@ -252,11 +337,39 @@ class PartnerExtractionController extends Controller
             $authorization->finalized_at = now();
             $authorization->save();
 
+            CreditAuditLog::create([
+                'actor_user_id' => $user->id,
+                'target_user_id' => $user->id,
+                'event_key' => 'partner.authorization.finalized',
+                'entity_type' => 'partner_extraction_authorization',
+                'entity_id' => $authorization->id,
+                'old_values' => ['status' => 'authorized'],
+                'new_values' => [
+                    'partner_domain' => $authorization->partner_domain,
+                    'partner_user_id' => $authorization->partner_user_reference,
+                    'partner_request_id' => $authorization->partner_request_id,
+                    'reserved_credits' => (int) $authorization->credits_reserved,
+                    'consumed_credits' => (int) $authorization->credits_consumed,
+                    'refunded_credits' => (int) $authorization->credits_refunded,
+                    'status' => 'finalized',
+                ],
+                'request_id' => $authorization->partner_request_id,
+            ]);
+
             return ['authorization' => $authorization, 'credit_balance' => (int) $user->credit_balance, 'reused' => false];
         });
 
         /** @var PartnerExtractionAuthorization $authorization */
         $authorization = $result['authorization'];
+
+        if (!(bool) $result['reused']) {
+            $authorization->loadMissing('user:id,email');
+            $eventKey = $authorization->status === 'finalized' ? 'finalized' : 'failed';
+            $creditOutcome = $authorization->status === 'finalized' ? 'settled' : 'refunded';
+            $this->activityService->emitSystemEvent($eventKey, $authorization, [
+                'credit_outcome' => $creditOutcome,
+            ]);
+        }
 
         return response()->json([
             'partner_request_id' => $authorization->partner_request_id,

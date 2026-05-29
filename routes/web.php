@@ -25,7 +25,7 @@ Route::middleware(['App\Http\Middleware\CheckAuth'])->group(function () {
         $user = User::findOrFail((int) session('user_id'));
         $settings = AppSetting::current();
         $maxUploadMb = $settings->effectiveMaxUploadMb();
-        $allApiTiers = ['paid_1', 'paid_2', 'paid_3'];
+        $allApiTiers = ['paid_1'];
         $allowedApiTiers = (bool) $user->is_admin
             ? $allApiTiers
             : array_values(array_intersect($allApiTiers, (array) ($user->allowed_api_tiers ?? [])));

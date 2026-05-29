@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\CreditService;
+use Illuminate\Support\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -140,5 +141,68 @@ class GithubPipelineSmokeTest extends TestCase
         ])->postJson('/api/github/callback', $payload);
 
         $res->assertStatus(401);
+    }
+
+    public function test_stale_processing_document_is_marked_failed_and_refunded_on_list(): void
+    {
+        /** @var User $user */
+        $user = User::factory()->create([
+            'company_name' => 'Timeout Test Ltd',
+            'status' => 'active',
+            'credit_balance' => 20,
+            'credit_cap' => 0,
+            'must_change_password' => false,
+            'is_admin' => false,
+        ]);
+
+        /** @var Document $doc */
+        $doc = Document::create([
+            'user_id' => $user->id,
+            'request_id' => '33333333-3333-3333-3333-333333333333',
+            'filename' => 'timeout.pdf',
+            'path' => 'convocation/timeout.pdf',
+            'status' => 'processing',
+            'pages_requested' => 4,
+            'page_start' => 1,
+            'page_end' => 4,
+            'credits_reserved' => 0,
+            'credit_status' => 'none',
+        ]);
+
+        /** @var CreditService $credit */
+        $credit = app(CreditService::class);
+        $reserve = $credit->reserveForUpload(
+            userId: $user->id,
+            documentId: $doc->id,
+            pagesRequested: 4,
+            actorUserId: $user->id,
+        );
+        $this->assertSame(4, (int) $reserve['reserved']);
+
+        $doc->refresh();
+        $doc->credits_reserved = 4;
+        $doc->credit_status = 'reserved';
+        $doc->created_at = Carbon::now()->subHours(10);
+        $doc->save();
+
+        $user->refresh();
+        $this->assertSame(16, (int) $user->credit_balance);
+
+        $res = $this->withSession([
+            'authenticated' => true,
+            'user_id' => $user->id,
+            'is_admin' => false,
+        ])->getJson('/api/documents');
+
+        $res->assertOk();
+
+        $doc->refresh();
+        $user->refresh();
+
+        $this->assertSame('failed', $doc->status);
+        $this->assertSame('failed', $doc->credit_status);
+        $this->assertSame(4, (int) $doc->credits_refunded);
+        $this->assertSame('Processing timed out before extractor callback.', $doc->failed_reason);
+        $this->assertSame(20, (int) $user->credit_balance);
     }
 }

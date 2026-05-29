@@ -57,10 +57,11 @@
 
             <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                 <h2 class="text-xl font-semibold">Paystack</h2>
-                <p class="text-sm text-gray-600 mt-1">Card payment option (coming soon).</p>
-                <button type="button" disabled class="mt-3 w-full py-3 bg-slate-200 text-slate-600 font-semibold rounded-lg cursor-not-allowed">
+                <p class="text-sm text-gray-600 mt-1">Pay online and credits will be added automatically after verification.</p>
+                <button id="paystackBtn" type="button" class="mt-3 w-full py-3 bg-slate-950 text-white font-semibold rounded-lg hover:bg-slate-800 transition">
                     Pay with Paystack
                 </button>
+                <p class="mt-2 text-xs text-gray-500">Use the requested credits field below, then click this button to open secure checkout.</p>
             </div>
 
             <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">

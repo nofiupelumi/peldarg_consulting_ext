@@ -62,6 +62,9 @@ return [
         'authority_domain' => env('BILLING_AUTHORITY_DOMAIN', 'https://extract.peldargconsulting.com'),
         'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('PARTNER_ALLOWED_ORIGINS', 'https://extraction.riskcontrolnigeria.com'))))),
         'centralized_billing_enabled' => (bool) env('CENTRALIZED_BILLING_ENABLED', true),
+        'credit_sync_url' => env('PARTNER_CREDIT_SYNC_URL'),
+        'reconciliation_url' => env('PARTNER_RECONCILIATION_URL'),
+        'credit_sync_timeout' => (int) env('PARTNER_CREDIT_SYNC_TIMEOUT_SECONDS', 10),
     ],
 
     'contact_notify_to' => env('CONTACT_NOTIFY_TO'),
