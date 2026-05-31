@@ -98,6 +98,7 @@ Route::middleware([
     Route::post('/partner/finalize-extraction', [PartnerExtractionController::class, 'finalizeExtraction']);
     Route::post('/partner/paystack/initialize', [PartnerCapabilityController::class, 'paystackInitialize']);
     Route::post('/partner/paystack/verify', [PartnerCapabilityController::class, 'paystackVerify']);
+    Route::post('/partner/user/update-email', [PartnerCapabilityController::class, 'updateUserEmail']);
 });
 
 // Phase 7: User migration endpoint (admin operation, uses simple token auth in controller)

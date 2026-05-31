@@ -67,7 +67,15 @@ class PaystackPaymentService
             ]);
         });
 
-        if ($invoice->gateway_authorization_url && $invoice->gateway_access_code && in_array((string) $invoice->gateway_status, self::ACTIVE_GATEWAY_STATUSES, true)) {
+        // Paystack access codes expire after ~10 minutes; only reuse within 8 minutes.
+        // If the access_code is stale we fall through and re-initialize against the Paystack
+        // API (same invoice row, new reference + access_code).
+        $accessCodeFresh = $invoice->initialized_at
+            && $invoice->initialized_at->gt(now()->subMinutes(8));
+
+        if ($invoice->gateway_authorization_url && $invoice->gateway_access_code
+            && in_array((string) $invoice->gateway_status, self::ACTIVE_GATEWAY_STATUSES, true)
+            && $accessCodeFresh) {
             return ['invoice' => $invoice->fresh(), 'reused' => true];
         }
 

@@ -101,6 +101,39 @@ class PartnerCapabilityController extends Controller
         );
     }
 
+    public function updateUserEmail(Request $request)
+    {
+        $this->assertPartnerToken($request);
+
+        $data = $request->validate([
+            'current_email' => 'required|email',
+            'new_email'     => 'required|email|max:180',
+        ]);
+
+        $user = User::query()->where('email', $data['current_email'])->first();
+        if (!$user) {
+            throw ValidationException::withMessages(['current_email' => 'No peldarg account found for this email.']);
+        }
+
+        if (strtolower($data['new_email']) !== strtolower($data['current_email'])) {
+            $taken = User::query()
+                ->where('email', $data['new_email'])
+                ->where('id', '!=', $user->id)
+                ->exists();
+            if ($taken) {
+                throw ValidationException::withMessages(['new_email' => 'That email is already registered on this system.']);
+            }
+        }
+
+        $user->email = $data['new_email'];
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'email'   => $user->email,
+        ]);
+    }
+
     public function paystackInitialize(Request $request, PaystackPaymentService $paystack)
     {
         $this->assertPartnerToken($request);
