@@ -139,8 +139,9 @@ class PartnerCapabilityController extends Controller
         $this->assertPartnerToken($request);
 
         $data = $request->validate([
-            'user_email' => 'required|email',
+            'user_email'        => 'required|email',
             'requested_credits' => 'required|integer|min:1',
+            'callback_url'      => 'nullable|url|max:500',
         ]);
 
         $user = User::query()->where('email', $data['user_email'])->first();
@@ -148,20 +149,28 @@ class PartnerCapabilityController extends Controller
             throw ValidationException::withMessages(['user_email' => 'No peldarg account found for this email.']);
         }
 
-        $result = $paystack->initializeForUser($user, (int) $data['requested_credits']);
+        // Partner API calls always force a fresh Paystack access_code so the inline popup
+        // never receives a stale/consumed code. The invoice row is reused if one exists.
+        $result = $paystack->initializeForUser(
+            $user,
+            (int) $data['requested_credits'],
+            isset($data['callback_url']) ? (string) $data['callback_url'] : null,
+            forceRefresh: true,
+        );
         /** @var CreditInvoice $invoice */
         $invoice = $result['invoice'];
 
         return response()->json([
-            'invoice_id' => $invoice->id,
-            'invoice_number' => $invoice->invoice_number,
-            'reference' => $invoice->gateway_reference,
-            'access_code' => $invoice->gateway_access_code,
+            'invoice_id'        => $invoice->id,
+            'invoice_number'    => $invoice->invoice_number,
+            'reference'         => $invoice->gateway_reference,
+            'access_code'       => $invoice->gateway_access_code,
             'authorization_url' => $invoice->gateway_authorization_url,
-            'amount_ngn_kobo' => (int) $invoice->amount_ngn_kobo,
+            'amount_ngn_kobo'   => (int) $invoice->amount_ngn_kobo,
             'requested_credits' => (int) $invoice->requested_credits,
-            'public_key' => (string) config('services.paystack.public_key', ''),
-            'reused' => (bool) ($result['reused'] ?? false),
+            'public_key'        => (string) config('services.paystack.public_key', ''),
+            'user_email'        => (string) $user->email,
+            'reused'            => (bool) ($result['reused'] ?? false),
         ]);
     }
 

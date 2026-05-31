@@ -19,7 +19,7 @@ class PaystackPaymentService
     {
     }
 
-    public function initializeForUser(User $user, int $requestedCredits): array
+    public function initializeForUser(User $user, int $requestedCredits, ?string $callbackUrl = null, bool $forceRefresh = false): array
     {
         $settings = AppSetting::current();
         $requestedCredits = max(1, $requestedCredits);
@@ -67,10 +67,12 @@ class PaystackPaymentService
             ]);
         });
 
-        // Paystack access codes expire after ~10 minutes; only reuse within 8 minutes.
-        // If the access_code is stale we fall through and re-initialize against the Paystack
-        // API (same invoice row, new reference + access_code).
-        $accessCodeFresh = $invoice->initialized_at
+        // Paystack access codes expire after ~10 minutes.
+        // When $forceRefresh is true (partner API calls always set this) or when the
+        // access_code is stale (> 8 min old), we fall through and call the Paystack API
+        // to generate a fresh reference + access_code on the same invoice row.
+        $accessCodeFresh = !$forceRefresh
+            && $invoice->initialized_at
             && $invoice->initialized_at->gt(now()->subMinutes(8));
 
         if ($invoice->gateway_authorization_url && $invoice->gateway_access_code
@@ -84,8 +86,16 @@ class PaystackPaymentService
             throw ValidationException::withMessages(['paystack' => 'Paystack secret key is not configured.']);
         }
 
-        $reference = 'PSK-' . str_replace('INV-', '', (string) $invoice->invoice_number) . '-' . Str::upper(Str::random(6));
-        $callbackUrl = (string) (config('services.paystack.callback_url') ?: url('/top-up'));
+        // Build a unique reference. When re-initializing an existing invoice (forceRefresh or
+        // stale access_code) append a short timestamp+random suffix so the old Paystack
+        // transaction reference is never reused, preventing "duplicate reference" errors.
+        $baseRef = 'PSK-' . str_replace('INV-', '', (string) $invoice->invoice_number);
+        $reference = $invoice->gateway_reference
+            ? $baseRef . '-R' . now()->format('His') . Str::upper(Str::random(4))
+            : $baseRef . '-' . Str::upper(Str::random(6));
+
+        $resolvedCallbackUrl = $callbackUrl
+            ?: (string) (config('services.paystack.callback_url') ?: url('/top-up'));
 
         $response = Http::withToken($secret)
             ->acceptJson()
@@ -93,7 +103,7 @@ class PaystackPaymentService
                 'email' => $user->email,
                 'amount' => (int) $invoice->amount_ngn_kobo,
                 'reference' => $reference,
-                'callback_url' => $callbackUrl,
+                'callback_url' => $resolvedCallbackUrl,
                 'metadata' => [
                     'invoice_id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
