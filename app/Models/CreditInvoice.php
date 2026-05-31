@@ -15,6 +15,7 @@ class CreditInvoice extends Model
         'requested_amount_usd',
         'payment_reference',
         'payment_provider',
+        'payment_source',
         'gateway_reference',
         'gateway_access_code',
         'gateway_authorization_url',

@@ -42,11 +42,12 @@ class PaystackPaymentService
             }
 
             if ($forceRefresh) {
-                // Cancel any existing active invoices so we always start with a fresh
-                // invoice reflecting the current requested_credits and live pricing.
+                // Cancel any existing active Paystack invoices so we always start with a
+                // fresh invoice reflecting the current requested_credits and live pricing.
+                // Only touches payment_source='paystack' rows; manual invoices are unaffected.
                 CreditInvoice::query()
                     ->where('user_id', $lockedUser->id)
-                    ->where('payment_provider', 'paystack')
+                    ->where('payment_source', 'paystack')
                     ->whereNull('fulfilled_at')
                     ->whereIn('gateway_status', self::ACTIVE_GATEWAY_STATUSES)
                     ->whereNotIn('status', ['approved'])
@@ -55,7 +56,7 @@ class PaystackPaymentService
                 $existing = CreditInvoice::query()
                     ->lockForUpdate()
                     ->where('user_id', $lockedUser->id)
-                    ->where('payment_provider', 'paystack')
+                    ->where('payment_source', 'paystack')
                     ->whereNull('fulfilled_at')
                     ->whereIn('gateway_status', self::ACTIVE_GATEWAY_STATUSES)
                     ->whereNotIn('status', ['approved', 'rejected', 'cancelled'])
@@ -74,6 +75,7 @@ class PaystackPaymentService
                 'unit_price_usd' => $unitPriceUsd,
                 'requested_amount_usd' => $amountUsd,
                 'payment_provider' => 'paystack',
+                'payment_source' => 'paystack',
                 'gateway_status' => 'initializing',
                 'amount_ngn_kobo' => $amountKobo,
                 'status' => 'pending',
@@ -213,8 +215,14 @@ class PaystackPaymentService
                 return ['handled' => false, 'invoice' => $invoice, 'reason' => 'payment_not_successful'];
             }
 
-            if ($amount !== (int) $invoice->amount_ngn_kobo) {
-                throw ValidationException::withMessages(['amount' => 'Verified amount does not match invoice amount.']);
+            // Trust Paystack's status check. The kobo amount returned by Paystack
+            // must be >= what the invoice expects (we won't fulfil underpayments).
+            // We allow a 1-kobo tolerance for rounding and never fail on overpayment
+            // (rounding up is fine). Strict equality caused false failures in test mode.
+            if ($amount < ((int) $invoice->amount_ngn_kobo - 1)) {
+                $invoice->admin_note = trim((string) $invoice->admin_note . "\nPaystack amount {$amount} kobo less than invoice amount {$invoice->amount_ngn_kobo} kobo. Manual review required.");
+                $invoice->save();
+                throw ValidationException::withMessages(['amount' => 'Payment amount is less than the invoice amount. Please contact support.']);
             }
 
             $user = User::query()->lockForUpdate()->findOrFail($invoice->user_id);

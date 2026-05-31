@@ -34,8 +34,11 @@ class CreditInvoiceController extends Controller
     {
         $userId = (int) $request->session()->get('user_id');
 
+        // Only return manual (bank-transfer) invoices. Paystack transactions are
+        // visible via the payment-history endpoint instead.
         return CreditInvoice::query()
             ->where('user_id', $userId)
+            ->where('payment_source', 'manual')
             ->latest()
             ->get();
     }
@@ -68,6 +71,7 @@ class CreditInvoiceController extends Controller
             'requested_amount_usd' => round($credits * $unitPriceUsd, 4),
             'payment_reference' => $data['payment_reference'] ?? null,
             'proof_path' => $proofPath,
+            'payment_source' => 'manual',
             'status' => 'pending',
         ]);
 
@@ -88,8 +92,11 @@ class CreditInvoiceController extends Controller
     {
         $status = $request->query('status');
 
+        // Admin queue is for manual (bank-transfer) invoices only.
+        // Paystack invoices are auto-fulfilled and do not require admin approval.
         $list = CreditInvoice::query()
             ->with(['user:id,company_name,name'])
+            ->where('payment_source', 'manual')
             ->when($status, fn ($q) => $q->where('status', $status))
             ->latest()
             ->get();
@@ -106,6 +113,9 @@ class CreditInvoiceController extends Controller
     public function approve(Request $request, CreditInvoice $invoice)
     {
         $request->validate(['admin_note' => 'nullable|string|max:1000']);
+        if ($invoice->payment_source === 'paystack') {
+            return response()->json(['error' => 'Paystack invoices are auto-fulfilled and cannot be manually approved.'], 422);
+        }
         if ($invoice->status !== 'pending') {
             return response()->json(['error' => 'Invoice already reviewed'], 422);
         }
@@ -158,6 +168,9 @@ class CreditInvoiceController extends Controller
     public function reject(Request $request, CreditInvoice $invoice)
     {
         $data = $request->validate(['admin_note' => 'required|string|max:1000']);
+        if ($invoice->payment_source === 'paystack') {
+            return response()->json(['error' => 'Paystack invoices are auto-fulfilled and cannot be manually rejected.'], 422);
+        }
         if ($invoice->status !== 'pending') {
             return response()->json(['error' => 'Invoice already reviewed'], 422);
         }
