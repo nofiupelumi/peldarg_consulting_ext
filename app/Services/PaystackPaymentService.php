@@ -27,7 +27,7 @@ class PaystackPaymentService
         $amountUsd = round($requestedCredits * $unitPriceUsd, 4);
         $amountKobo = max(100, (int) round($amountUsd * (float) $settings->fx_rate_ngn * 100));
 
-        $invoice = DB::transaction(function () use ($user, $requestedCredits, $unitPriceUsd, $amountUsd, $amountKobo) {
+        $invoice = DB::transaction(function () use ($user, $requestedCredits, $unitPriceUsd, $amountUsd, $amountKobo, $forceRefresh) {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
 
             if ($lockedUser->status !== 'active') {
@@ -41,17 +41,30 @@ class PaystackPaymentService
                 ]);
             }
 
-            $existing = CreditInvoice::query()
-                ->lockForUpdate()
-                ->where('user_id', $lockedUser->id)
-                ->where('payment_provider', 'paystack')
-                ->whereNull('fulfilled_at')
-                ->whereIn('gateway_status', self::ACTIVE_GATEWAY_STATUSES)
-                ->latest('id')
-                ->first();
+            if ($forceRefresh) {
+                // Cancel any existing active invoices so we always start with a fresh
+                // invoice reflecting the current requested_credits and live pricing.
+                CreditInvoice::query()
+                    ->where('user_id', $lockedUser->id)
+                    ->where('payment_provider', 'paystack')
+                    ->whereNull('fulfilled_at')
+                    ->whereIn('gateway_status', self::ACTIVE_GATEWAY_STATUSES)
+                    ->whereNotIn('status', ['approved'])
+                    ->update(['gateway_status' => 'cancelled', 'status' => 'cancelled']);
+            } else {
+                $existing = CreditInvoice::query()
+                    ->lockForUpdate()
+                    ->where('user_id', $lockedUser->id)
+                    ->where('payment_provider', 'paystack')
+                    ->whereNull('fulfilled_at')
+                    ->whereIn('gateway_status', self::ACTIVE_GATEWAY_STATUSES)
+                    ->whereNotIn('status', ['approved', 'rejected', 'cancelled'])
+                    ->latest('id')
+                    ->first();
 
-            if ($existing) {
-                return $existing;
+                if ($existing) {
+                    return $existing;
+                }
             }
 
             return CreditInvoice::create([
@@ -86,9 +99,10 @@ class PaystackPaymentService
             throw ValidationException::withMessages(['paystack' => 'Paystack secret key is not configured.']);
         }
 
-        // Build a unique reference. When re-initializing an existing invoice (forceRefresh or
-        // stale access_code) append a short timestamp+random suffix so the old Paystack
-        // transaction reference is never reused, preventing "duplicate reference" errors.
+        // Build a unique reference for this Paystack transaction.
+        // forceRefresh always creates a brand-new invoice so gateway_reference is null;
+        // the plain suffix path is taken. The -R path handles the edge case where the
+        // same invoice row is re-initialized (non-forceRefresh stale path).
         $baseRef = 'PSK-' . str_replace('INV-', '', (string) $invoice->invoice_number);
         $reference = $invoice->gateway_reference
             ? $baseRef . '-R' . now()->format('His') . Str::upper(Str::random(4))
