@@ -20,7 +20,10 @@ class PaystackPaymentController extends Controller
         ]);
 
         $user = User::findOrFail((int) $request->session()->get('user_id'));
-        $result = $this->paystack->initializeForUser($user, (int) $data['requested_credits']);
+        // Always force a fresh invoice and access_code so any pending invoice from a
+        // partner (RCS) top-up attempt is cancelled and the user always pays for exactly
+        // what they requested at current pricing.
+        $result = $this->paystack->initializeForUser($user, (int) $data['requested_credits'], forceRefresh: true);
         /** @var CreditInvoice $invoice */
         $invoice = $result['invoice'];
 
