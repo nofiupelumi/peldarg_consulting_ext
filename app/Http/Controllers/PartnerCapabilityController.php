@@ -88,8 +88,9 @@ class PartnerCapabilityController extends Controller
 
         $data = $request->validate([
             'user_email' => 'required|email',
-            'year' => 'nullable|integer|min:2000|max:2100',
-            'month' => 'nullable|integer|min:1|max:12',
+            'year'       => 'nullable|integer|min:2000|max:2100',
+            'month'      => 'nullable|integer|min:1|max:12',
+            'tz_offset'  => 'nullable|integer|min:-840|max:840',
         ]);
 
         return response()->json(
@@ -97,6 +98,7 @@ class PartnerCapabilityController extends Controller
                 (string) $data['user_email'],
                 isset($data['year']) ? (int) $data['year'] : null,
                 isset($data['month']) ? (int) $data['month'] : null,
+                isset($data['tz_offset']) ? (int) $data['tz_offset'] : null,
             )
         );
     }
