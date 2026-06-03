@@ -7,7 +7,7 @@ use Exception;
 class SignatureService
 {
     public const ALGORITHM = 'hmac-sha256';
-    public const MAX_TIMESTAMP_AGE_SECONDS = 300; // 5 minutes
+    public const MAX_TIMESTAMP_AGE_SECONDS = 300; // 5 minutes (overridden by PARTNER_SIGNATURE_MAX_AGE_SECONDS env)
     private static array $nonces = [];
 
     /**
@@ -104,8 +104,9 @@ class SignatureService
             $now = now();
             $diff = $now->diffInSeconds($requestTime, false);
 
-            if ($diff > self::MAX_TIMESTAMP_AGE_SECONDS || $diff < -self::MAX_TIMESTAMP_AGE_SECONDS) {
-                return 'Request timestamp is too old or in future (max age: ' . self::MAX_TIMESTAMP_AGE_SECONDS . ' seconds)';
+            $maxAge = (int) env('PARTNER_SIGNATURE_MAX_AGE_SECONDS', self::MAX_TIMESTAMP_AGE_SECONDS);
+            if ($diff > $maxAge || $diff < -$maxAge) {
+                return 'Request timestamp is too old or in future (max age: ' . $maxAge . ' seconds)';
             }
 
             return null;
