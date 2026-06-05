@@ -35,12 +35,20 @@
                             Dashboard
                         </a>
                     @else
-                        <a
-                            href="{{ route('login') }}"
-                            class="inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300 transition"
-                        >
-                            Log in
-                        </a>
+                        <div class="flex items-center gap-3">
+                            <a
+                                href="{{ route('portfolio') }}"
+                                class="inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold border border-white/20 hover:border-white/30 transition"
+                            >
+                                Portfolio
+                            </a>
+                            <a
+                                href="{{ route('login') }}"
+                                class="inline-flex items-center rounded-md px-4 py-2 text-sm font-semibold bg-amber-400 text-slate-950 hover:bg-amber-300 transition"
+                            >
+                                Log in
+                            </a>
+                        </div>
                     @endauth
                 @endif
             </div>
